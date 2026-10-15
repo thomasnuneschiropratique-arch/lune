@@ -1,0 +1,381 @@
+/* Lune — vue Urgence — préservatif rompu / rapport à risque (js/ui/views/urgence.js). « Ciel de Lune ».
+   Classe racine : .v-urg. Tokens et composants partagés : css/app.css. Aucune couleur littérale ici.
+   Ton calme mais clair : l'écran n'est jamais peint en « danger » ; seule la carte « Appelle le 15 »
+   garde le rouge d'alerte. Comptes à rebours en pastilles lisibles. Icône de l'écran : la bouée
+   (jamais le bouclier, réservé à « protection nécessaire »). Pas de tireté (réservé aux prévisions). */
+
+.v-urg {
+  --on-pastel: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) .v-urg { --on-pastel: var(--brand-ink); }
+}
+:root[data-theme="sombre"] .v-urg { --on-pastel: var(--brand-ink); }
+
+/* --------------------------------------------------------------------------
+   1. Structure
+   -------------------------------------------------------------------------- */
+.v-urg > section,
+.v-urg [tabindex="-1"] {
+  scroll-margin-top: calc(var(--topbar-h) + var(--safe-top) + var(--space-3));
+}
+.v-urg [tabindex="-1"]:focus { outline: none; }
+
+.v-urg .v-urg__intro {
+  position: relative;
+  padding-right: calc(var(--space-4) + 52px);
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, var(--line));
+  background: linear-gradient(170deg, var(--wash) 0%, color-mix(in srgb, var(--wash) 30%, var(--surface)) 70%);
+}
+.v-urg .v-urg__buoy {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--brand);
+  box-shadow: inset 0 0 0 2px var(--brand), var(--shadow-1);
+}
+.v-urg .v-urg__buoy .icon { stroke-width: 2; }
+@media (prefers-reduced-motion: no-preference) {
+  .v-urg .v-urg__buoy .icon { animation: urg-sway 5s ease-in-out infinite; transform-origin: 50% 50%; }
+}
+@keyframes urg-sway { 50% { transform: rotate(14deg); } }
+.v-urg .v-urg__title {
+  font-size: var(--fs-xl);
+  color: var(--ink);
+}
+.v-urg .v-urg__lead {
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.v-urg .v-urg__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.v-urg .v-urg__num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  transform: rotate(-6deg);
+}
+
+/* --------------------------------------------------------------------------
+   2. Champs date / heure
+   -------------------------------------------------------------------------- */
+.v-urg .v-urg__when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.v-urg .v-urg__pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+@media (min-width: 400px) {
+  .v-urg .v-urg__pair { grid-template-columns: 3fr 2fr; }
+}
+.v-urg .v-urg__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  font-weight: 600;
+  cursor: pointer;
+}
+.v-urg .v-urg__check input { flex: none; accent-color: var(--brand); }
+.v-urg .v-urg__first {
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.v-urg .hint .icon { display: inline-block; vertical-align: -3px; }
+
+/* Options de la contraception d'urgence : une option par ligne */
+.v-urg .v-urg__seg-col { flex-direction: column; }
+.v-urg .v-urg__seg-col .seg__opt { flex: 1 1 auto; }
+
+/* --------------------------------------------------------------------------
+   3. Options et comptes à rebours
+   -------------------------------------------------------------------------- */
+.v-urg .v-urg__elapsed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  font-weight: 600;
+  color: var(--ink);
+}
+.v-urg .v-urg__elapsed .icon { flex: none; color: var(--brand); }
+
+.v-urg .v-urg__option {
+  --opt-tone: var(--ok);
+  --opt-soft: var(--ok-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--opt-tone);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.v-urg .v-urg__option--warn { --opt-tone: var(--warn); --opt-soft: var(--warn-soft); }
+/* Délai dépassé : neutre et plein (ni braise ni tireté) */
+.v-urg .v-urg__option--past {
+  --opt-tone: var(--line-strong);
+  --opt-soft: var(--surface);
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.v-urg .v-urg__option.is-recommended {
+  border-color: var(--brand);
+  border-top-color: var(--opt-tone);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--opt-soft) 70%, var(--surface)) 0, var(--surface) 90px);
+  box-shadow: 0 0 0 1px var(--brand), var(--shadow-1);
+}
+.v-urg .v-urg__option-head { align-items: flex-start; flex-wrap: wrap; }
+.v-urg .v-urg__option-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+}
+.v-urg .v-urg__rank {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  align-self: center;
+}
+.v-urg .v-urg__option.is-recommended .v-urg__rank { background: var(--gold); color: color-mix(in srgb, var(--gold) 20%, var(--on-pastel)); }
+.v-urg .v-urg__first-choice { align-self: flex-start; }
+
+.v-urg .v-urg__state {
+  --st-tone: var(--ok);
+  --st-soft: var(--ok-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--st-tone);
+  border-radius: var(--radius-pill);
+  background: var(--st-soft);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.2;
+}
+.v-urg .v-urg__state .icon { color: var(--st-tone); }
+.v-urg .v-urg__state--warn { --st-tone: var(--warn); --st-soft: var(--warn-soft); }
+.v-urg .v-urg__state--past {
+  --st-tone: var(--muted);
+  --st-soft: var(--surface-2);
+}
+
+.v-urg .v-urg__deadline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+}
+.v-urg .v-urg__deadline-main {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--ink);
+}
+.v-urg .v-urg__option--past .v-urg__deadline-main {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+/* Compte à rebours : pastille lisible (texte ≥ 6:1 dans les deux thèmes) */
+.v-urg .v-urg__remaining {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-soft);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 45%, transparent);
+  color: var(--brand);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.v-urg .v-urg__remaining .icon { flex: none; }
+.v-urg .v-urg__option--warn .v-urg__remaining {
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--warn) 45%, transparent);
+  color: var(--warn);
+}
+
+.v-urg .v-urg__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--info-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.v-urg .v-urg__note .icon { flex: none; margin-top: 2px; color: var(--info); }
+
+/* --------------------------------------------------------------------------
+   4. Où aller
+   -------------------------------------------------------------------------- */
+.v-urg .v-urg__places {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.v-urg .v-urg__place {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.v-urg .v-urg__place-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--brand);
+  color: var(--surface);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.v-urg .v-urg__place-icon--pill { background: var(--gold); color: color-mix(in srgb, var(--gold) 20%, var(--on-pastel)); }
+.v-urg .v-urg__place-icon--home { background: var(--ph-lut); color: color-mix(in srgb, var(--ph-lut) 20%, var(--on-pastel)); }
+.v-urg .v-urg__place-icon--heart { background: var(--ph-foll); color: color-mix(in srgb, var(--ph-foll) 20%, var(--on-pastel)); }
+.v-urg .v-urg__place-title { font-weight: 700; }
+
+.v-urg .v-urg__line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.v-urg .v-urg__line { border-top: 4px solid var(--info); }
+.v-urg .v-urg__number {
+  color: var(--info);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.v-urg .v-urg__details {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+.v-urg .v-urg__details > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-weight: 600;
+  color: var(--brand);
+  cursor: pointer;
+}
+.v-urg .v-urg__details > p {
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   5. Listes, signes d'urgence, enregistrement, liens
+   -------------------------------------------------------------------------- */
+.v-urg .v-urg__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 1.2em;
+  line-height: 1.5;
+}
+.v-urg .v-urg__list--tight { gap: var(--space-1); }
+
+.v-urg .v-urg__danger .alert { padding: var(--space-4); }
+
+.v-urg .v-urg__saved {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ok);
+  border-radius: var(--radius-sm);
+  background: var(--ok-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.v-urg .v-urg__saved .icon { flex: none; color: var(--ok); }
+.v-urg .v-urg__error {
+  color: var(--danger);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.v-urg .v-urg__ec {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.v-urg .v-urg__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.v-urg .v-urg__link {
+  justify-content: flex-start;
+  text-align: left;
+}
+.v-urg .v-urg__link > span { flex: 1; }
+.v-urg .v-urg__link .icon { flex: none; color: var(--brand); }
+
+.v-urg .v-urg__reset {
+  display: flex;
+  justify-content: center;
+}
+
+@media print {
+  .v-urg .v-urg__reset, .v-urg .v-urg__links { display: none; }
+}
+
+/* Origine du rapport (VA-2) : pré-rempli d'après le suivi, ou rien trouvé. */
+.v-urg .v-urg__origin .hint { display: flex; gap: var(--space-1); align-items: flex-start; }
+.v-urg .v-urg__origin .hint .icon { flex: none; margin-top: 2px; }

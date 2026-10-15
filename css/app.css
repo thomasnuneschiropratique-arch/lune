@@ -1,0 +1,1529 @@
+/* ==========================================================================
+   Lune — design system « Ciel de Lune »
+   Tokens, base, composants partagés, coque, feuilles modales, toasts.
+   Chaque vue a sa propre feuille dans css/views/ (n'éditer que la sienne).
+
+   IDÉE
+   Le cycle se lit comme une journée de ciel : J1 se lève à l'horizon gauche (aube),
+   l'ovulation passe au zénith, la phase lutéale redescend (crépuscule). Le ciel est
+   ÉMOTIONNEL ; la décision est FONCTIONNELLE et n'a que deux langages :
+     - « protection nécessaire »  = aplat chaud « braise » HACHURÉ + BOUCLIER dans un carré arrondi ;
+     - « pas de protection »      = fond menthe UNI + COCHE dans un rond.
+
+   PALETTE (clair / sombre)
+     Neutres   --bg #f7f4fa / #100e1f · --surface #fff / #1b1830 · --ink #1d1934 / #f3f0fb
+     Marque    --brand indigo #4a36c2 / lavande #b4a7ff · --gold #f4b73a / #ffcf6b (décor seulement)
+     Décision  --protect braise #c4410f / #ff9d5c (+ --protect-hatch) · --safe menthe #17695a / #5fd0b4
+     Règles    --period #b8355e / #ff8fb0 : MARQUEUR seulement (.dawn-bar), jamais un fond
+     Prévision --forecast #6d6390 / #9a92bd : bords POINTILLÉS
+     Ciels     --sky-* et --wash redéfinis par [data-phase] sur <html> (posé par js/main.js)
+     Phases    --ph-regles #ffb3c4 · --ph-foll #ffc48f · --ph-ovu #ffd95c · --ph-lut #c9b8ff (arc du héros)
+
+   RÈGLES D'USAGE (sécurité visuelle, prioritaires sur toute envie de décor)
+   S1. Une case / pastille de jour est peinte selon la DÉCISION (DayStatus.protectionNeeded) :
+       true → .st--protect (hachuré + bouclier) ; false → .st--safe / .st--pre (coche).
+       Un jour infertile selon les règles mais « retenu » (apprentissage, strict, cycle 0…)
+       est peint en protection ; l'état des règles n'apparaît que dans le libellé, le titre et
+       l'aria-label. Utiliser decisionLook(status) de js/ui/dom.js (classes stCls / badgeCls).
+   S2. Le TIRETÉ / pointillé est réservé aux PRÉVISIONS (jours futurs, .st--future, .badge--forecast).
+       « Infertile pré-ovulatoire par règle » : bord PLEIN + coche cerclée, teinte plus claire (.st--pre).
+   S3. Les règles (saignement) sont un MARQUEUR (.dawn-bar, barre « aube » en bas de case),
+       jamais une couleur de fond ; la décision reste la couleur de fond.
+   S4. Hachures : bandes ≥ 6 px, contraste bande/fond ≥ 1,3:1 dans les deux thèmes
+       (--protect-hatch sur --protect : 1,37 / 1,51 ; --protect-hatch-soft sur --protect-soft : 1,35 / 1,51).
+   S5. Aucune couleur de phase ou d'accent verte / bleu-vert : ce territoire est réservé à --safe*.
+       (--ok est donc indigo, --info bleu, --coverline bleu.)
+   S6. Contraste AA dans les deux thèmes : texte ≥ 4,5:1, gros texte / graphiques ≥ 3:1.
+       Héros : le texte reste dans les 60 % du haut (jamais sur la bande d'horizon 62–82 %) ;
+       en bas, seulement sur la « mer » (--sky-sea / --sea-ink). Cibles tactiles ≥ 44 px,
+       focus visible, aucune animation essentielle (prefers-reduced-motion respecté).
+   S7. Discrétion : jamais le mot « règles » dans le héros ; pas de rose criard (le rose reste
+       un marqueur fin ou un ciel d'aube adouci).
+
+   Coque attendue (construite par js/main.js) :
+     <html data-phase="regles|folliculaire|ovulatoire|luteale|inconnue" [data-theme="clair|sombre"]>
+     <div class="app">
+       <header class="topbar">
+         <a class="topbar__brand">[logo svg.logo] <span class="topbar__title">Lune</span></a>
+         [<span class="badge badge--brand">Démo</span>]
+         <div class="topbar__actions">
+           <a class="topbar__urgence">[buoy] Urgence</a>
+           <a class="iconbtn" aria-label="Réglages">[gear]</a>
+         </div>
+       </header>
+       <div class="notices">…</div>
+       <main class="main">…</main>
+       <nav class="tabbar">
+         <a class="tabbar__item" aria-current="page">[icône]<span class="tabbar__label">Aujourd'hui</span></a>
+         <a class="tabbar__item tabbar__item--primary"><span class="tabbar__plus">[plus]</span><span class="tabbar__label">Noter</span></a>
+         …
+       </nav>
+     </div>
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens — thème clair (défaut)
+   -------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  /* Fonds, bordures */
+  --bg: #f7f4fa;
+  --wash: #e9e6f5;                   /* lavis du haut d'écran = ciel de la phase (voir [data-phase]) */
+  --surface: #ffffff;
+  --surface-2: #f0ecf6;
+  --line: #e2dcec;                   /* séparateurs décoratifs */
+  --line-strong: #857a9c;            /* bords de champs, chips (≥ 3:1) */
+  --grid: rgba(74, 54, 194, 0.06);   /* graphiques seulement (plus de quadrillage de fond) */
+  --grid-strong: rgba(74, 54, 194, 0.11);
+
+  /* Textes */
+  --ink: #1d1934;
+  --ink-2: #423b5e;
+  --muted: #5f5878;
+
+  /* Marque — indigo vif ; or = décor seulement */
+  --brand: #4a36c2;
+  --brand-ink: #ffffff;              /* texte posé SUR --brand */
+  --brand-soft: #ebe7fd;
+  --brand-deep: #34259a;
+  --gold: #f4b73a;
+
+  /* Décision : PROTECTION — braise hachurée (fertile ET indéterminé ET jours « retenus ») */
+  --protect: #c4410f;                /* aplat */
+  --protect-ink: #ffffff;            /* texte / icône sur l'aplat (5,11 ; 7,0 sur la bande) */
+  --protect-deep: #8f2d06;           /* texte « protection » sur fond clair / --protect-soft */
+  --protect-soft: #ffe8d9;
+  --protect-hatch: rgba(60, 10, 0, 0.26);        /* bandes sur --protect (1,37:1) */
+  --protect-hatch-soft: rgba(196, 65, 15, 0.22); /* bandes sur --protect-soft (1,35:1) */
+
+  /* Décision : PAS DE PROTECTION — menthe, uni */
+  --safe: #17695a;                   /* disque de coche, icône */
+  --safe-ink: #ffffff;
+  --safe-text: #0f4d41;
+  --safe-soft: #dff3ec;
+  --safe-line: #2d8a76;
+  --safe-pre: #3e8a7c;               /* pré-ovulatoire par règle : bord PLEIN, coche cerclée */
+  --safe-pre-soft: #ecf7f3;
+  --safe-pre-text: #1d5a4e;
+
+  /* Alias historiques (vues) : l'indéterminé suit le code chaud hachuré */
+  --fertile: var(--protect-deep);
+  --fertile-soft: var(--protect-soft);
+  --fertile-hatch: var(--protect-hatch-soft);
+  --unknown: var(--protect-deep);
+  --unknown-soft: var(--protect-soft);
+  --unknown-hatch: var(--protect-hatch-soft);
+
+  /* Règles — marqueur « aube » seulement */
+  --period: #b8355e;
+  --period-soft: #fde4ec;
+  --period-text: #8e2347;
+
+  /* Prévisions — pointillés */
+  --forecast: #6d6390;
+
+  /* Phases (segments de l'arc, identiques dans les deux thèmes ; jamais un fond de décision) */
+  --ph-regles: #ffb3c4;
+  --ph-foll: #ffc48f;
+  --ph-ovu: #ffd95c;
+  --ph-lut: #c9b8ff;
+  --dawn: linear-gradient(90deg, var(--period), var(--ph-foll));
+
+  /* Courbe */
+  --temp: #4a36c2;
+  --coverline: #2f5fb0;
+  --peak: #8a3aa6;
+
+  /* Alertes (pas de vert : S5) */
+  --danger: #a3213a;
+  --danger-soft: #f8e3e6;
+  --warn: #7f5100;
+  --warn-soft: #fbf0d8;
+  --ok: var(--brand);
+  --ok-soft: var(--brand-soft);
+  --info: #34509a;
+  --info-soft: #e6ebf7;
+
+  --focus: #5a3ee6;
+  --scrim: rgba(16, 12, 40, 0.5);
+  --toast-bg: #262046;
+  --toast-ink: #f3f0fb;
+  --shadow-1: 0 1px 2px rgba(29, 25, 52, 0.06), 0 6px 18px rgba(29, 25, 52, 0.07);
+  --shadow-2: 0 14px 36px rgba(29, 25, 52, 0.18), 0 2px 6px rgba(29, 25, 52, 0.08);
+  --shadow-brand: 0 8px 18px -8px rgba(74, 54, 194, 0.7);
+
+  /* Ciel (défaut = « inconnue » ; redéfini par [data-phase]) */
+  --sky-top: #2c2a5e;
+  --sky-mid: #463f8a;
+  --sky-low: #7a6aa8;
+  --sky-horizon: #c9b4e0;            /* lueur d'horizon (81,5 %) : AUCUN texte dessus */
+  --sky-sea: #221f4a;                /* « mer » sous l'horizon */
+  --sky-ink: #ffffff;                /* texte dans les 60 % du haut */
+  --sea-ink: #e4e0fa;                /* texte sur la mer */
+  --sky-line: rgba(14, 10, 48, 0.38);/* liseré sous l'arc */
+  --sky-mark: rgba(255, 255, 255, 0.55); /* graduations, horizon, trace */
+  --sky-star: rgba(255, 255, 255, 0.8);
+  --sky: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 45%, var(--sky-low) 72%, var(--sky-horizon) 81.5%, var(--sky-sea) 81.7%, var(--sky-sea) 100%);
+  --moon: #fff1cc;
+  --moon-dark: rgba(255, 255, 255, 0.10);
+  --moon-rim: rgba(255, 255, 255, 0.35);
+  --moon-glow: rgba(255, 214, 140, 0.16);
+  --moon-line: transparent;          /* liseré de la lune sur les ciels clairs */
+  /* Lune posée sur une surface (moonSvg hors du ciel) */
+  --moon-surface: #ffd36b;
+  --moon-surface-line: #8a5a00;
+  --moon-surface-dark: #ebe7fd;
+
+  /* Polices */
+  --font-display: 'Young Serif', Georgia, 'Times New Roman', serif;
+  --font-body: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Échelle typographique (≈ 1,2) */
+  --fs-xs: 0.8125rem;   /* 13 */
+  --fs-sm: 0.875rem;    /* 14 */
+  --fs-base: 1rem;      /* 16 */
+  --fs-md: 1.125rem;    /* 18 */
+  --fs-lg: 1.375rem;    /* 22 */
+  --fs-xl: 1.75rem;     /* 28 */
+  --fs-2xl: 2.5rem;     /* 40 */
+  --fs-3xl: 3.5rem;     /* 56 */
+  --fs-hero: 4.75rem;   /* 76 — gros chiffre du jour de cycle dans le héros */
+
+  /* Formes, espacements */
+  --radius: 18px;
+  --radius-lg: 22px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Mise en page */
+  --maxw: 640px;
+  --gutter: 16px;
+  --topbar-h: 60px;
+  --tabbar-h: 68px;
+  --tap: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur: 220ms;
+
+  --hatch-color: var(--protect-hatch-soft);
+}
+
+/* Ciels de phase — clair (data-phase posé sur <html> par js/main.js) */
+:root[data-phase="regles"] {            /* aube rosée */
+  --wash: #f3e3ee;
+  --sky-top: #4f3a86; --sky-mid: #7e4687; --sky-low: #b8678f; --sky-horizon: #f6b0a8; --sky-sea: #fbe7ec;
+  --sky-ink: #ffffff; --sea-ink: #4a1830;
+  --sky-line: rgba(30, 10, 40, 0.32); --sky-mark: rgba(255, 255, 255, 0.55); --sky-star: rgba(255, 255, 255, 0.8);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.10); --moon-rim: rgba(255, 255, 255, 0.35);
+}
+:root[data-phase="folliculaire"] {      /* matin abricot (ciel clair : encre sombre) */
+  --wash: #fde9da;
+  --sky-top: #ff9b73; --sky-mid: #ffc29a; --sky-low: #ffe2bd; --sky-horizon: #fff0d8; --sky-sea: #fff0e2;
+  --sky-ink: #5a2408; --sea-ink: #5a2408;
+  --sky-line: rgba(90, 40, 0, 0.30); --sky-mark: rgba(90, 40, 0, 0.45); --sky-star: rgba(255, 255, 255, 0.9);
+  --moon-line: #6b4400; --moon-dark: rgba(90, 40, 0, 0.14); --moon-rim: rgba(90, 40, 0, 0.35);
+}
+:root[data-phase="ovulatoire"] {        /* plein soleil (ciel clair : encre sombre) */
+  --wash: #fbf0cf;
+  --sky-top: #f2a10f; --sky-mid: #ffcf3f; --sky-low: #ffe58a; --sky-horizon: #fff0b0; --sky-sea: #fff6d6;
+  --sky-ink: #4a3000; --sea-ink: #573a00;
+  --sky-line: rgba(90, 40, 0, 0.30); --sky-mark: rgba(90, 50, 0, 0.5); --sky-star: rgba(255, 255, 255, 0.9);
+  --moon-line: #6b4400; --moon-dark: rgba(90, 40, 0, 0.14); --moon-rim: rgba(90, 40, 0, 0.35);
+}
+:root[data-phase="luteale"] {           /* crépuscule */
+  --wash: #e6e0f8;
+  --sky-top: #2a2470; --sky-mid: #4b3a9e; --sky-low: #8a4c8c; --sky-horizon: #f08a62; --sky-sea: #231c58;
+  --sky-ink: #ffffff; --sea-ink: #e9e4ff;
+  --sky-line: rgba(14, 10, 48, 0.38); --sky-mark: rgba(255, 255, 255, 0.55); --sky-star: rgba(255, 255, 255, 0.8);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.10); --moon-rim: rgba(255, 255, 255, 0.35);
+}
+:root[data-phase="inconnue"] {          /* ciel de nuit neutre */
+  --wash: #e9e6f5;
+  --sky-top: #2c2a5e; --sky-mid: #463f8a; --sky-low: #7a6aa8; --sky-horizon: #c9b4e0; --sky-sea: #221f4a;
+  --sky-ink: #ffffff; --sea-ink: #e4e0fa;
+  --sky-line: rgba(14, 10, 48, 0.38); --sky-mark: rgba(255, 255, 255, 0.55); --sky-star: rgba(255, 255, 255, 0.8);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.10); --moon-rim: rgba(255, 255, 255, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   2. Tokens — thème sombre (auto, sauf choix « clair » ; ou choix « sombre »)
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) {
+    color-scheme: dark;
+    --bg: #100e1f;
+    --wash: #1a1838;
+    --surface: #1b1830;
+    --surface-2: #252140;
+    --line: #34304f;
+    --line-strong: #7a7399;
+    --grid: rgba(180, 167, 255, 0.06);
+    --grid-strong: rgba(180, 167, 255, 0.11);
+    --ink: #f3f0fb;
+    --ink-2: #cdc7e3;
+    --muted: #a49dc0;
+    --brand: #b4a7ff;
+    --brand-ink: #1a1440;
+    --brand-soft: #2b2560;
+    --brand-deep: #d6ceff;
+    --gold: #ffcf6b;
+    --protect: #ff9d5c;
+    --protect-ink: #2a0f00;
+    --protect-deep: #ffb27f;
+    --protect-soft: #3a1f12;
+    --protect-hatch: rgba(42, 15, 0, 0.22);
+    --protect-hatch-soft: rgba(255, 157, 92, 0.2);
+    --safe: #5fd0b4;
+    --safe-ink: #0c2a24;
+    --safe-text: #9ee8d4;
+    --safe-soft: #12332e;
+    --safe-line: #3fb59a;
+    --safe-pre: #4fb8a2;
+    --safe-pre-soft: #142a28;
+    --safe-pre-text: #a6e6d6;
+    --period: #ff8fb0;
+    --period-soft: #3d1a2a;
+    --period-text: #ffb3c8;
+    --forecast: #9a92bd;
+    --temp: #b4a7ff;
+    --coverline: #8fb0f0;
+    --peak: #e0a0f0;
+    --danger: #f28b9c;
+    --danger-soft: #45202a;
+    --warn: #f0b95c;
+    --warn-soft: #3b2c12;
+    --info: #a9b8f0;
+    --info-soft: #1b2340;
+    --focus: #c9bfff;
+    --scrim: rgba(0, 0, 0, 0.6);
+    --toast-bg: #efeaff;
+    --toast-ink: #1d1934;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-brand: 0 8px 22px -8px rgba(180, 167, 255, 0.5);
+    --sky-top: #0e0d2a; --sky-mid: #211d55; --sky-low: #3a3070; --sky-horizon: #6a5a9a; --sky-sea: #0b0a22;
+    --sky-ink: #ffffff; --sea-ink: #d6d0f2;
+    --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+    --moon: #ffeec2; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+    --moon-glow: rgba(255, 214, 140, 0.12); --moon-line: transparent;
+    --moon-surface: #ffeec2; --moon-surface-line: transparent; --moon-surface-dark: #2b2560;
+  }
+}
+
+:root[data-theme="sombre"] {
+  color-scheme: dark;
+  --bg: #100e1f;
+  --wash: #1a1838;
+  --surface: #1b1830;
+  --surface-2: #252140;
+  --line: #34304f;
+  --line-strong: #7a7399;
+  --grid: rgba(180, 167, 255, 0.06);
+  --grid-strong: rgba(180, 167, 255, 0.11);
+  --ink: #f3f0fb;
+  --ink-2: #cdc7e3;
+  --muted: #a49dc0;
+  --brand: #b4a7ff;
+  --brand-ink: #1a1440;
+  --brand-soft: #2b2560;
+  --brand-deep: #d6ceff;
+  --gold: #ffcf6b;
+  --protect: #ff9d5c;
+  --protect-ink: #2a0f00;
+  --protect-deep: #ffb27f;
+  --protect-soft: #3a1f12;
+  --protect-hatch: rgba(42, 15, 0, 0.22);
+  --protect-hatch-soft: rgba(255, 157, 92, 0.2);
+  --safe: #5fd0b4;
+  --safe-ink: #0c2a24;
+  --safe-text: #9ee8d4;
+  --safe-soft: #12332e;
+  --safe-line: #3fb59a;
+  --safe-pre: #4fb8a2;
+  --safe-pre-soft: #142a28;
+  --safe-pre-text: #a6e6d6;
+  --period: #ff8fb0;
+  --period-soft: #3d1a2a;
+  --period-text: #ffb3c8;
+  --forecast: #9a92bd;
+  --temp: #b4a7ff;
+  --coverline: #8fb0f0;
+  --peak: #e0a0f0;
+  --danger: #f28b9c;
+  --danger-soft: #45202a;
+  --warn: #f0b95c;
+  --warn-soft: #3b2c12;
+  --info: #a9b8f0;
+  --info-soft: #1b2340;
+  --focus: #c9bfff;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --toast-bg: #efeaff;
+  --toast-ink: #1d1934;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-brand: 0 8px 22px -8px rgba(180, 167, 255, 0.5);
+  --sky-top: #0e0d2a; --sky-mid: #211d55; --sky-low: #3a3070; --sky-horizon: #6a5a9a; --sky-sea: #0b0a22;
+  --sky-ink: #ffffff; --sea-ink: #d6d0f2;
+  --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+  --moon: #ffeec2; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+  --moon-glow: rgba(255, 214, 140, 0.12); --moon-line: transparent;
+  --moon-surface: #ffeec2; --moon-surface-line: transparent; --moon-surface-dark: #2b2560;
+}
+
+/* Ciels de phase — sombre (spécificité plus forte que les blocs clairs) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"])[data-phase="regles"] {
+    --wash: #261632;
+    --sky-top: #1e1440; --sky-mid: #4a2858; --sky-low: #8a4a66; --sky-horizon: #c06a7e; --sky-sea: #24142a;
+    --sky-ink: #ffffff; --sea-ink: #ffc9d6;
+    --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+    --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+  }
+  :root:not([data-theme="clair"])[data-phase="folliculaire"] {
+    --wash: #2a1a22;
+    --sky-top: #2a1838; --sky-mid: #6a3842; --sky-low: #a85a4c; --sky-horizon: #e0875e; --sky-sea: #2a1714;
+    --sky-ink: #ffe4cf; --sea-ink: #ffd2b0;
+    --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 228, 207, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+    --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+  }
+  :root:not([data-theme="clair"])[data-phase="ovulatoire"] {
+    --wash: #2a2114;
+    --sky-top: #3a2410; --sky-mid: #6e4810; --sky-low: #9a6a18; --sky-horizon: #e6a92a; --sky-sea: #2a1d08;
+    --sky-ink: #ffeab0; --sea-ink: #ffe08a;
+    --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 234, 176, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+    --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+  }
+  :root:not([data-theme="clair"])[data-phase="luteale"] {
+    --wash: #1d1846;
+    --sky-top: #0b0a26; --sky-mid: #1f1a5c; --sky-low: #4a2c6e; --sky-horizon: #a0503f; --sky-sea: #0a0920;
+    --sky-ink: #ffffff; --sea-ink: #cfc8f0;
+    --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+    --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+  }
+  :root:not([data-theme="clair"])[data-phase="inconnue"] {
+    --wash: #1a1838;
+    --sky-top: #0e0d2a; --sky-mid: #211d55; --sky-low: #3a3070; --sky-horizon: #6a5a9a; --sky-sea: #0b0a22;
+    --sky-ink: #ffffff; --sea-ink: #d6d0f2;
+    --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+    --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+  }
+}
+:root[data-theme="sombre"][data-phase="regles"] {
+  --wash: #261632;
+  --sky-top: #1e1440; --sky-mid: #4a2858; --sky-low: #8a4a66; --sky-horizon: #c06a7e; --sky-sea: #24142a;
+  --sky-ink: #ffffff; --sea-ink: #ffc9d6;
+  --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+}
+:root[data-theme="sombre"][data-phase="folliculaire"] {
+  --wash: #2a1a22;
+  --sky-top: #2a1838; --sky-mid: #6a3842; --sky-low: #a85a4c; --sky-horizon: #e0875e; --sky-sea: #2a1714;
+  --sky-ink: #ffe4cf; --sea-ink: #ffd2b0;
+  --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 228, 207, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+}
+:root[data-theme="sombre"][data-phase="ovulatoire"] {
+  --wash: #2a2114;
+  --sky-top: #3a2410; --sky-mid: #6e4810; --sky-low: #9a6a18; --sky-horizon: #e6a92a; --sky-sea: #2a1d08;
+  --sky-ink: #ffeab0; --sea-ink: #ffe08a;
+  --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 234, 176, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+}
+:root[data-theme="sombre"][data-phase="luteale"] {
+  --wash: #1d1846;
+  --sky-top: #0b0a26; --sky-mid: #1f1a5c; --sky-low: #4a2c6e; --sky-horizon: #a0503f; --sky-sea: #0a0920;
+  --sky-ink: #ffffff; --sea-ink: #cfc8f0;
+  --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+}
+:root[data-theme="sombre"][data-phase="inconnue"] {
+  --wash: #1a1838;
+  --sky-top: #0e0d2a; --sky-mid: #211d55; --sky-low: #3a3070; --sky-horizon: #6a5a9a; --sky-sea: #0b0a22;
+  --sky-ink: #ffffff; --sea-ink: #d6d0f2;
+  --sky-line: rgba(0, 0, 0, 0.35); --sky-mark: rgba(255, 255, 255, 0.5); --sky-star: rgba(255, 255, 255, 0.75);
+  --moon-line: transparent; --moon-dark: rgba(255, 255, 255, 0.08); --moon-rim: rgba(255, 255, 255, 0.3);
+}
+
+/* --------------------------------------------------------------------------
+   3. Reset léger et base
+   -------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  accent-color: var(--brand);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Lavis de ciel en haut d'écran (couleur de la phase), puis le fond */
+  background: linear-gradient(180deg, var(--wash) 0, var(--bg) 320px) no-repeat, var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure, blockquote { margin: 0; }
+ul, ol { padding-left: 1.25em; }
+img, svg, video, canvas { display: block; max-width: 100%; }
+svg.icon { flex: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+table { border-collapse: collapse; width: 100%; }
+[hidden] { display: none !important; }
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-xl);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+h2 { font-size: var(--fs-lg); line-height: 1.25; font-weight: 700; }
+h3 { font-size: var(--fs-md); line-height: 1.3; font-weight: 700; }
+h4 { font-size: var(--fs-base); line-height: 1.35; font-weight: 700; }
+strong, b { font-weight: 700; }
+small { font-size: var(--fs-sm); }
+
+a { color: var(--brand); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection { background: var(--brand-soft); color: var(--ink); }
+
+/* Données : chiffres tabulaires partout où ça compte */
+.mono, code, kbd, samp, input[type="number"], input[inputmode="decimal"], time, td, th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   4. Utilitaires
+   -------------------------------------------------------------------------- */
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.stack--sm { gap: var(--space-2); }
+.stack--lg { gap: var(--space-5); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.muted { color: var(--muted); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums slashed-zero; }
+.display { font-family: var(--font-display); font-weight: 400; line-height: 1.05; letter-spacing: -0.01em; }
+.section-title {
+  font-family: var(--font-display);
+  font-size: 1.1875rem;  /* 19 */
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.divider {
+  height: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: var(--space-2) 0;
+}
+
+/* Hachures (protection) : bandes ≥ 6 px (S4). Couleur via --hatch-color. */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, var(--hatch-color) 0 6px, transparent 6px 12px);
+}
+
+/* Papier millimétré : réservé aux graphiques (plus de quadrillage de fond) */
+.paper {
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background-position: -1px -1px;
+}
+
+/* Tons de statut : exposent --tone / --tone-soft / --hatch-color aux vues.
+   fertile / unknown / transition / protect / held = code « protection » (chaud hachuré). */
+.tone-fertile, .tone-unknown, .tone-transition, .tone-protect, .tone-held {
+  --tone: var(--protect-deep); --tone-soft: var(--protect-soft); --hatch-color: var(--protect-hatch-soft);
+}
+.tone-safe-pre   { --tone: var(--safe-pre); --tone-soft: var(--safe-pre-soft); --hatch-color: transparent; }
+.tone-safe       { --tone: var(--safe);     --tone-soft: var(--safe-soft);     --hatch-color: transparent; }
+.tone-period     { --tone: var(--period);   --tone-soft: var(--period-soft);   --hatch-color: transparent; }
+.tone-brand      { --tone: var(--brand);    --tone-soft: var(--brand-soft);    --hatch-color: transparent; }
+
+/* Aplats de décision prêts à l'emploi (cartes, cases) */
+.fill-protect {
+  color: var(--protect-ink);
+  background: repeating-linear-gradient(135deg, var(--protect-hatch) 0 7px, transparent 7px 15px), var(--protect);
+}
+.fill-safe { color: var(--safe-text); background: var(--safe-soft); border: 2px solid var(--safe-line); }
+.fill-pre { color: var(--safe-pre-text); background: var(--safe-pre-soft); border: 2px solid var(--safe-pre); }
+
+/* Ciel de la phase en cours (héros, liseré du conseil du jour) */
+.sky { background: var(--sky); color: var(--sky-ink); }
+
+/* --------------------------------------------------------------------------
+   5. Pastilles d'état (S1–S3) — partagées par Aujourd'hui, Calendrier, Cycles
+   <span class="st st--protect|st--safe|st--pre|st--mixed [st--future] [st--sm|st--xs]">[icône]</span>
+   Classe : decisionLook(status).stCls. Forme : carré arrondi = protection, rond = sans protection.
+   -------------------------------------------------------------------------- */
+.st {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.st .icon { width: 20px; height: 20px; stroke-width: 2.3; }
+.st--protect {
+  color: var(--protect-ink);
+  background: repeating-linear-gradient(135deg, var(--protect-hatch) 0 6px, transparent 6px 12px), var(--protect);
+}
+.st--safe {
+  border-radius: 50%;
+  color: var(--safe);
+  background: var(--safe-soft);
+  border: 2px solid var(--safe-line);
+}
+.st--pre {
+  border-radius: 50%;
+  color: var(--safe-pre);
+  background: var(--safe-pre-soft);
+  border: 2px solid var(--safe-pre);
+}
+/* Coche cerclée = pré-ovulatoire par règle */
+.st--pre .icon {
+  width: 22px;
+  height: 22px;
+  padding: 2px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  stroke-width: 2.4;
+}
+.st--mixed {
+  color: var(--ink);
+  border: 1.5px solid var(--line-strong);
+  background:
+    linear-gradient(135deg, transparent 49%, var(--ink) 49% 51%, transparent 51%),
+    linear-gradient(135deg, transparent 50%, var(--safe-soft) 50%),
+    repeating-linear-gradient(135deg, var(--protect-hatch) 0 6px, transparent 6px 12px),
+    var(--protect);
+}
+.st--mixed .icon { width: 24px; height: 24px; padding: 2px; border-radius: 50%; background: var(--surface); color: var(--ink); }
+/* Prévision (jour futur) : contour pointillé, aucun aplat ; l'icône dit l'état prévu */
+.st--future {
+  color: var(--forecast);
+  background: transparent;
+  border: 1.5px dashed var(--forecast);
+}
+.st--future .icon { border: 0; background: transparent; color: var(--forecast); }
+.st--sm { width: 26px; height: 26px; border-radius: 8px; }
+.st--sm .icon { width: 15px; height: 15px; }
+.st--xs { width: 22px; height: 22px; border-radius: 7px; }
+.st--xs .icon { width: 13px; height: 13px; stroke-width: 2.6; }
+.st--sm.st--safe, .st--sm.st--pre, .st--xs.st--safe, .st--xs.st--pre { border-radius: 50%; }
+.st--sm.st--pre .icon, .st--xs.st--pre .icon { padding: 1px; border-width: 1px; }
+
+/* Jour courant : anneau de marque (jamais une couleur d'état) */
+.today-ring { background: var(--brand-soft); box-shadow: inset 0 0 0 2px var(--brand); }
+
+/* Marqueur des règles : barre « aube » en bas de case (S3) */
+.dawn-bar {
+  display: block;
+  width: 22px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--dawn);
+}
+.dawn-bar--forecast { background: transparent; border: 1.5px dashed var(--period); height: 6px; }
+
+/* --------------------------------------------------------------------------
+   6. Cartes
+   -------------------------------------------------------------------------- */
+.card {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-1);
+}
+.card--flat {
+  background: var(--surface-2);
+  border-color: transparent;
+  box-shadow: none;
+}
+.card.paper, .card--paper {
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background-position: -1px -1px;
+}
+/* Carte « prévision » : tiretée, sans ombre, trame de points (S2) */
+.card--forecast {
+  border: 1.5px dashed var(--forecast);
+  box-shadow: none;
+  background: radial-gradient(circle, var(--line) 1px, transparent 1.4px) 0 0 / 12px 12px, var(--bg);
+}
+@media (min-width: 480px) {
+  .card { padding: var(--space-5); }
+}
+
+/* --------------------------------------------------------------------------
+   7. Boutons
+   -------------------------------------------------------------------------- */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 10px 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-base);
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), transform 120ms var(--ease), box-shadow var(--dur) var(--ease);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.btn:hover { background: var(--surface-2); text-decoration: none; }
+.btn:active { transform: translateY(1px); }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Primaire : touche indigo, 54 px, rayon 18, ombre interne basse et point d'or */
+.btn--primary {
+  min-height: 54px;
+  padding: 12px 34px 12px 22px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18), var(--shadow-brand);
+}
+.btn--primary::before {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.btn--primary:hover { background: color-mix(in srgb, var(--brand) 88%, var(--ink)); }
+.btn--primary:active { box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18), var(--shadow-brand); }
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--brand);
+}
+.btn--ghost:hover { background: var(--brand-soft); }
+
+.btn--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--surface);
+}
+.btn--danger:hover { background: color-mix(in srgb, var(--danger) 88%, var(--ink)); }
+
+/* Compact visuellement, mais zone tactile étendue à 44 px */
+.btn--sm {
+  min-height: var(--tap);   /* 44 px : cible tactile réelle (S6), même pour les petits boutons */
+  padding: 6px 14px;
+  font-size: var(--fs-sm);
+  border-radius: 12px;
+}
+.btn--sm.btn--primary { min-height: var(--tap); padding: 6px 14px; border-radius: 12px; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18); }
+.btn--sm.btn--primary::before { display: none; }
+.btn--block { display: flex; width: 100%; }
+
+/* Bouton icône seul (toujours avec aria-label) */
+.iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.iconbtn:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); color: var(--ink); }
+
+/* --------------------------------------------------------------------------
+   8. Puces et contrôle segmenté
+   -------------------------------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 8px 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.chip:hover { background: var(--surface-2); }
+/* Sélectionnée : triple indice (fond, bord 2 px, coche) */
+.chip.is-on, .chip[aria-pressed="true"], .chip[aria-checked="true"] {
+  padding: 7.5px 13.5px 7.5px 11px;
+  border: 2px solid var(--brand);
+  background: var(--brand-soft);
+  color: var(--ink);
+}
+.chip.is-on::before, .chip[aria-pressed="true"]::before, .chip[aria-checked="true"]::before {
+  content: '';
+  flex: none;
+  width: 11px;
+  height: 6px;
+  margin: 0 3px 0 1px;
+  border-left: 2.5px solid var(--brand);
+  border-bottom: 2.5px solid var(--brand);
+  transform: translateY(-2px) rotate(-45deg);
+}
+
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+.seg__opt {
+  flex: 1 1 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--tap);
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.seg__opt:hover { color: var(--ink); background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.seg__opt.is-on, .seg__opt[aria-pressed="true"], .seg__opt[aria-checked="true"], .seg__opt[aria-selected="true"] {
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.16), var(--shadow-1);
+}
+.seg--wrap { flex-wrap: wrap; }
+.seg--wrap .seg__opt { flex: 1 1 calc(50% - 4px); }
+
+/* --------------------------------------------------------------------------
+   9. Formulaires
+   -------------------------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.label { font-size: 0.9375rem; font-weight: 700; color: var(--ink); }
+.hint { font-size: var(--fs-sm); color: var(--muted); line-height: 1.4; }
+
+.input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: max(16px, 1rem);   /* ≥ 16 px : pas de zoom iOS */
+  line-height: 1.3;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.input::placeholder { color: var(--muted); opacity: 1; }
+.input:focus-visible, .input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 35%, transparent);
+}
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.input:disabled { opacity: 0.6; }
+textarea.input { min-height: 104px; resize: vertical; }
+select.input {
+  padding-right: 40px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
+    linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 52%, calc(100% - 14px) 52%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+.input.mono, input.input[inputmode="decimal"] { font-family: var(--font-mono); letter-spacing: 0.02em; }
+input[type="range"] { width: 100%; min-height: var(--tap); }
+input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; margin: 0; }
+
+/* --------------------------------------------------------------------------
+   10. Badges — badgeCls de decisionLook(status) pour une décision
+   -------------------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px 3px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.badge .icon { width: 16px; height: 16px; stroke-width: 2.1; }
+
+/* Protection (fertile, indéterminé, retenu) : fond pâle chaud HACHURÉ, bord braise plein */
+.badge--protect, .badge--fertile, .badge--unknown, .badge--held {
+  border-color: var(--protect);
+  background: repeating-linear-gradient(135deg, var(--protect-hatch-soft) 0 6px, transparent 6px 12px), var(--protect-soft);
+  color: var(--protect-deep);
+}
+.badge--protect .icon, .badge--fertile .icon, .badge--unknown .icon, .badge--held .icon { color: var(--protect-deep); }
+
+/* Protection jusqu'à 18 h : moitié braise hachurée, moitié menthe */
+.badge--transition {
+  border-color: var(--protect);
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(135deg, var(--protect-hatch-soft) 0 6px, transparent 6px 12px) 0 0 / 55% 100% no-repeat,
+    linear-gradient(90deg, var(--protect-soft) 0 55%, var(--safe-soft) 55% 100%);
+}
+.badge--transition .icon { color: var(--protect-deep); }
+
+/* Pré-ovulatoire par règle : bord PLEIN, coche cerclée (S2) */
+.badge--safe-pre {
+  border-color: var(--safe-pre);
+  background: var(--safe-pre-soft);
+  color: var(--safe-pre-text);
+}
+.badge--safe-pre .icon { color: var(--safe-pre); padding: 1px; border: 1.5px solid currentColor; border-radius: 50%; }
+
+.badge--safe {
+  border-color: var(--safe-line);
+  background: var(--safe-soft);
+  color: var(--safe-text);
+}
+.badge--safe .icon { color: var(--safe); }
+
+/* Règles : badge neutre + barre « aube » (jamais un fond rose : S3) */
+.badge--period {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.badge--period::before {
+  content: '';
+  flex: none;
+  align-self: stretch;
+  width: 4px;
+  margin: 1px 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--period), var(--ph-foll));
+}
+.badge--period .icon { color: var(--period); }
+
+.badge--brand {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.badge--brand .icon { color: var(--brand); }
+
+/* Prévision : tiretée, transparente (S2) */
+.badge--forecast {
+  border: 1.5px dashed var(--forecast);
+  background: transparent;
+  color: var(--ink-2);
+}
+.badge--forecast .icon { color: var(--forecast); }
+
+/* --------------------------------------------------------------------------
+   11. Alertes et bandeaux
+   -------------------------------------------------------------------------- */
+.alert {
+  --alert-tone: var(--info);
+  --alert-soft: var(--info-soft);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  align-items: start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--alert-tone) 35%, transparent);
+  border-left: 5px solid var(--alert-tone);
+  border-radius: 16px;
+  background: var(--alert-soft);
+  color: var(--ink);
+}
+.alert > .icon { color: var(--alert-tone); margin-top: 2px; }
+.alert > :not(.icon) { grid-column: 2; min-width: 0; }
+.alert > .icon + * { grid-column: 2; }
+.alert__title { font-weight: 700; line-height: 1.3; }
+.alert--urgent { --alert-tone: var(--danger); --alert-soft: var(--danger-soft); }
+.alert--attention { --alert-tone: var(--warn); --alert-soft: var(--warn-soft); }
+.alert--info { --alert-tone: var(--info); --alert-soft: var(--info-soft); }
+
+.banner {
+  --banner-tone: var(--info);
+  --banner-soft: var(--info-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--banner-tone) 30%, transparent);
+  border-radius: 16px;
+  background: var(--banner-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.banner > .icon { color: var(--banner-tone); margin-top: 1px; }
+.banner__text { flex: 1; min-width: 0; }
+.banner .btn { flex: none; align-self: center; }
+.banner--warn { --banner-tone: var(--warn); --banner-soft: var(--warn-soft); }
+.banner--danger { --banner-tone: var(--danger); --banner-soft: var(--danger-soft); }
+.banner--info { --banner-tone: var(--info); --banner-soft: var(--info-soft); }
+.banner--demo { --banner-tone: var(--brand); --banner-soft: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 40%, transparent); }
+
+/* --------------------------------------------------------------------------
+   12. États vides (bord plein : le tireté est réservé aux prévisions)
+   -------------------------------------------------------------------------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--muted);
+  text-align: center;
+}
+.empty > .icon { color: var(--brand); opacity: 0.85; }
+
+/* --------------------------------------------------------------------------
+   13. Ciel : arc du héros (skyArcSvg) et lune (moonSvg) — js/ui/dom.js
+   Le conteneur porte .sky (dégradé) ; aspect-ratio 343 / 262 pour aligner l'horizon.
+   -------------------------------------------------------------------------- */
+.sky-arc { display: block; width: 100%; height: 100%; overflow: visible; }
+.sky-arc__star { fill: var(--sky-star); }
+.sky-arc__track { fill: none; stroke: var(--sky-mark); stroke-opacity: 0.35; stroke-width: 1; }
+.sky-arc__under { fill: none; stroke: var(--sky-line); stroke-width: 11; stroke-linecap: round; }
+.sky-arc__seg { fill: none; stroke-width: 6; stroke-linecap: round; }
+.sky-arc__seg--regles { stroke: var(--ph-regles); }
+.sky-arc__seg--folliculaire { stroke: var(--ph-foll); }
+.sky-arc__seg--ovulatoire { stroke: var(--ph-ovu); }
+.sky-arc__seg--luteale { stroke: var(--ph-lut); }
+.sky-arc__seg--future { stroke-dasharray: 0.1 8.5; stroke-width: 5; }  /* à venir = pointillé */
+.sky-arc__tick { fill: var(--sky-mark); }
+.sky-arc__tick--future { opacity: 0.55; }
+.sky-arc__tick--today { fill: var(--sky-ink); }
+.sky-arc__horizon { stroke: var(--sky-mark); stroke-width: 1; }
+
+.moon__halo { fill: var(--moon-glow); }
+.moon__dark { fill: var(--moon-dark); stroke: var(--moon-rim); stroke-width: 0.8; }
+.moon__lit { fill: var(--moon); stroke: var(--moon-line); stroke-width: 1.2; }
+/* Lune posée sur une surface (hors du ciel) */
+.moon-svg { flex: none; overflow: visible; }
+.moon-svg .moon__halo { fill: color-mix(in srgb, var(--gold) 22%, transparent); }
+.moon-svg .moon__dark { fill: var(--moon-surface-dark); stroke: var(--line-strong); }
+.moon-svg .moon__lit { fill: var(--moon-surface); stroke: var(--moon-surface-line); }
+.sky .moon-svg .moon__halo { fill: var(--moon-glow); }
+.sky .moon-svg .moon__dark { fill: var(--moon-dark); stroke: var(--moon-rim); }
+.sky .moon-svg .moon__lit { fill: var(--moon); stroke: var(--moon-line); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sky-arc .moon__halo { transform-box: fill-box; transform-origin: center; animation: lune-breathe 6s ease-in-out infinite; }
+  .sky-arc__star { animation: lune-twinkle 4.5s ease-in-out infinite; }
+  .sky-arc__star:nth-child(3n) { animation-delay: -1.5s; }
+  .sky-arc__star:nth-child(3n + 1) { animation-delay: -3s; }
+}
+@keyframes lune-breathe { 50% { transform: scale(1.12); opacity: 0.7; } }
+@keyframes lune-twinkle { 50% { opacity: 0.25; } }
+
+/* --------------------------------------------------------------------------
+   14. Coque : app, en-tête, contenu, barre d'onglets
+   -------------------------------------------------------------------------- */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: transparent;   /* le lavis du body reste visible */
+}
+
+/* Gouttière qui centre le contenu sur 640 px sans conteneur intérieur */
+.topbar, .tabbar {
+  --pad-x: max(var(--gutter), calc((100% - var(--maxw)) / 2));
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: calc(var(--topbar-h) + var(--safe-top));
+  padding: var(--safe-top) max(var(--pad-x), var(--safe-right)) 0 max(var(--pad-x), var(--safe-left));
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  background: color-mix(in srgb, var(--wash) 90%, transparent);
+  -webkit-backdrop-filter: saturate(1.2) blur(12px);
+  backdrop-filter: saturate(1.2) blur(12px);
+}
+.topbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: 12px;
+}
+.topbar__brand:hover { text-decoration: none; }
+.topbar__brand .logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  box-shadow: 0 4px 10px -4px rgba(42, 35, 115, 0.55);
+}
+.topbar__title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+.topbar__urgence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 14px 0 11px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+.topbar__urgence .icon { color: var(--brand); }
+.topbar__urgence:hover { border-color: var(--brand); text-decoration: none; }
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: calc(var(--maxw) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding:
+    var(--space-4)
+    max(var(--gutter), var(--safe-right))
+    calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6))
+    max(var(--gutter), var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.main:focus { outline: none; }
+
+/* Bandeaux de la coque (mise à jour, autre fenêtre, changement de jour) */
+.notices {
+  width: 100%;
+  max-width: calc(var(--maxw) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: var(--space-3) max(var(--gutter), var(--safe-right)) 0 max(var(--gutter), var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.notices:empty { display: none; }
+.notices:not(:empty) + .main { padding-top: var(--space-3); }
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  height: calc(var(--tabbar-h) + var(--safe-bottom));
+  padding: 0 max(var(--pad-x), var(--safe-right)) var(--safe-bottom) max(var(--pad-x), var(--safe-left));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  -webkit-backdrop-filter: saturate(1.2) blur(12px);
+  backdrop-filter: saturate(1.2) blur(12px);
+}
+.tabbar__item {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 6px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;   /* 12 px */
+  font-weight: 600;
+  line-height: 1.1;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+.tabbar__item:hover { color: var(--ink); text-decoration: none; }
+.tabbar__item .icon { width: 24px; height: 24px; }
+.tabbar__label { white-space: nowrap; }
+.tabbar__item[aria-current="page"], .tabbar__item.is-active { color: var(--brand); font-weight: 700; }
+/* Indicateur de 3 px au-dessus de l'onglet actif */
+.tabbar__item[aria-current="page"]::before, .tabbar__item.is-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--brand);
+  transform: translateX(-50%);
+}
+.tabbar__item:focus-visible { outline-offset: -3px; border-radius: 14px; }
+
+/* « Noter » : carré arrondi incliné de −6°, surélevé, avec un point d'or */
+.tabbar__item--primary { color: var(--ink-2); justify-content: flex-end; padding-bottom: 8px; }
+.tabbar__plus {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-top: -28px;
+  margin-bottom: 5px;
+  border-radius: 20px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: 0 0 0 4px var(--surface), var(--shadow-brand);
+  transform: rotate(-6deg);
+  transition: transform 200ms var(--ease-pop);
+}
+.tabbar__plus .icon { width: 28px; height: 28px; stroke-width: 2.6; transform: rotate(6deg); transition: transform 200ms var(--ease-pop); }
+.tabbar__plus::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 3px var(--surface);
+}
+.tabbar__item--primary:hover .tabbar__plus,
+.tabbar__item--primary:focus-visible .tabbar__plus { transform: rotate(0deg); }
+.tabbar__item--primary:hover .tabbar__plus .icon,
+.tabbar__item--primary:focus-visible .tabbar__plus .icon { transform: none; }
+.tabbar__item--primary:active .tabbar__plus { transform: rotate(0deg) scale(0.96); }
+.tabbar__item--primary[aria-current="page"]::before, .tabbar__item--primary.is-active::before { display: none; }
+.tabbar__item--primary[aria-current="page"], .tabbar__item--primary.is-active { color: var(--brand); }
+.tabbar__item--primary[aria-current="page"] .tabbar__plus { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--brand), var(--shadow-brand); }
+/* Compatibilité : icône directe sans .tabbar__plus */
+.tabbar__item--primary > .icon {
+  box-sizing: content-box;
+  width: 26px;
+  height: 26px;
+  padding: 13px;
+  margin-top: -26px;
+  border-radius: 20px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: 0 0 0 4px var(--surface), var(--shadow-brand);
+}
+
+/* --------------------------------------------------------------------------
+   15. Feuilles modales (créées par js/ui/sheet.js)
+   -------------------------------------------------------------------------- */
+html.has-sheet, html.has-sheet body { overflow: hidden; }
+
+.sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+.sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.sheet-layer.is-open .sheet__backdrop { opacity: 1; }
+.sheet-layer.is-under .sheet__backdrop { opacity: 0.5; }
+
+.sheet {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, var(--maxw));
+  max-height: calc(100vh - var(--safe-top) - 24px);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 28px 28px 0 0;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+  transform: translate(-50%, 100%);
+  transition: transform 300ms var(--ease);
+  outline: none;
+  overflow: hidden;
+}
+/* Fin liseré de ciel en haut de la feuille (décor) */
+.sheet::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--ph-regles), var(--ph-foll), var(--ph-ovu), var(--ph-lut));
+  opacity: 0.9;
+}
+@supports (height: 100dvh) {
+  .sheet { max-height: calc(100dvh - var(--safe-top) - 24px); }
+}
+.sheet-layer.is-open .sheet { transform: translate(-50%, 0); }
+
+.sheet__handle {
+  flex: none;
+  width: 40px;
+  height: 4px;
+  margin: 12px auto 0;
+  border-radius: 2px;
+  background: var(--line-strong);
+  opacity: 0.6;
+}
+.sheet__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-5);
+}
+.sheet__title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 1.3125rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+.sheet__close { flex: none; }
+.sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-2) var(--space-5) calc(var(--space-5) + var(--safe-bottom));
+}
+.sheet__text { color: var(--ink-2); }
+.sheet__actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-2);
+}
+@media (min-width: 420px) {
+  .sheet__actions { flex-direction: row; }
+  .sheet__actions > .btn { flex: 1 1 0; }
+}
+
+/* Grand écran : la feuille devient une fenêtre centrée */
+@media (min-width: 720px) and (min-height: 560px) {
+  .sheet {
+    top: 50%;
+    bottom: auto;
+    max-height: min(85vh, 760px);
+    border-bottom: 1px solid var(--line);
+    border-radius: 24px;
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+    transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  }
+  .sheet-layer.is-open .sheet { opacity: 1; transform: translate(-50%, -50%); }
+  .sheet__handle { display: none; }
+  .sheet__header { padding-top: var(--space-4); }
+  .sheet__body { padding-bottom: var(--space-5); }
+  .sheet--dialog { width: min(100% - 32px, 440px); }
+}
+
+/* --------------------------------------------------------------------------
+   16. Toasts (petite apparition « pop », coupée si mouvement réduit)
+   -------------------------------------------------------------------------- */
+.toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-4));
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(100% - 32px, var(--maxw));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.toast {
+  position: relative;
+  max-width: 100%;
+  padding: 12px 16px 12px 30px;
+  border-radius: 16px;
+  background: var(--toast-bg);
+  color: var(--toast-ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+  transition: opacity var(--dur) var(--ease), transform 320ms var(--ease-pop);
+  pointer-events: auto;
+}
+.toast::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.toast.is-in { opacity: 1; transform: none; }
+
+/* --------------------------------------------------------------------------
+   17. Accessibilité : mouvement réduit, contraste renforcé
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root { --line: var(--line-strong); --muted: var(--ink-2); }
+}
+
+@media (forced-colors: active) {
+  .badge, .chip, .seg__opt, .btn, .card, .alert, .banner, .st { border: 1px solid CanvasText; }
+  .chip.is-on, .seg__opt.is-on, .chip[aria-pressed="true"] { outline: 2px solid Highlight; }
+  .st--future, .badge--forecast, .card--forecast { border-style: dashed; }
+}
+
+/* --------------------------------------------------------------------------
+   18. Impression : la coque disparaît, le contenu reste lisible
+   -------------------------------------------------------------------------- */
+@media print {
+  :root { color-scheme: light; }
+  html, body, .app { background: #fff !important; color: #000; }
+  .topbar, .tabbar, .banner, .notices, .toast-region, .sheet-layer, .iconbtn, .no-print { display: none !important; }
+  .main { max-width: none; padding: 0; gap: 12px; }
+  .card { box-shadow: none; break-inside: avoid; border-color: #bbb; }
+  .badge, .hatch, .paper, .card--paper, .alert, .st, .fill-protect, .fill-safe, .fill-pre, .sky, .dawn-bar {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  a { color: inherit; text-decoration: underline; }
+}

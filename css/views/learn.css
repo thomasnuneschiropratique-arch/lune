@@ -1,0 +1,533 @@
+/* Lune — vue Comprendre — articles éducatifs (js/ui/views/learn.js). « Ciel de Lune ».
+   Toutes les règles sont préfixées par .v-learn. Tokens et composants partagés : css/app.css.
+   Aucune couleur littérale. Couleur par catégorie (.learn-cat--<id>), palette phases / or / indigo,
+   jamais de vert ni de braise (codes réservés à la décision, S1 et S5) :
+     demarrer = or · methode = indigo (--temp) · corps = lavande · sante = aube rosée
+     contraception = abricot · ressources = bleu (--info) · autres = encre. */
+
+.v-learn {
+  --on-pastel: var(--ink);
+  --cat: var(--brand);
+  --cat-bg: var(--cat);
+  --cat-fg: var(--surface);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) .v-learn { --on-pastel: var(--brand-ink); }
+}
+:root[data-theme="sombre"] .v-learn { --on-pastel: var(--brand-ink); }
+
+/* Catégories « profondes » : aplat de la couleur, icône couleur de surface */
+.v-learn .learn-cat--methode { --cat: var(--temp); --cat-bg: var(--cat); --cat-fg: var(--surface); }
+.v-learn .learn-cat--ressources { --cat: var(--info); --cat-bg: var(--cat); --cat-fg: var(--surface); }
+.v-learn .learn-cat--autres { --cat: var(--ink-2); --cat-bg: var(--cat); --cat-fg: var(--surface); }
+/* Catégories « pastel » : aplat lumineux, encre foncée dans les deux thèmes */
+.v-learn .learn-cat--demarrer,
+.v-learn .learn-cat--corps,
+.v-learn .learn-cat--sante,
+.v-learn .learn-cat--contraception {
+  --cat-bg: var(--cat);
+  --cat-fg: color-mix(in srgb, var(--cat) 20%, var(--on-pastel));
+}
+.v-learn .learn-cat--demarrer { --cat: var(--gold); }
+.v-learn .learn-cat--corps { --cat: var(--ph-lut); }
+.v-learn .learn-cat--sante { --cat: var(--ph-regles); }
+.v-learn .learn-cat--contraception { --cat: var(--ph-foll); }
+
+/* --------------------------------------------------------------------------
+   « Pour commencer » : petit ciel de la phase en cours.
+   Le texte reste dans le haut (dégradé haut → milieu du ciel, encre --sky-ink, ≥ 4,5:1) ;
+   la lueur d'horizon n'est qu'une bande décorative en bas, sans texte.
+   -------------------------------------------------------------------------- */
+.v-learn .learn-hero {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  padding: 18px var(--space-4) 0;
+  border-radius: 28px 28px 16px 16px;
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 62%, var(--sky-low) 80%, var(--sky-horizon) 91.8%, var(--sky-sea) 92%, var(--sky-sea) 100%);
+  color: var(--sky-ink);
+  box-shadow: var(--shadow-1);
+}
+.v-learn .learn-hero__stars {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle, var(--sky-star) 0 1.2px, transparent 1.7px) 62% 18% / 6px 6px no-repeat,
+    radial-gradient(circle, var(--sky-star) 0 1px, transparent 1.5px) 54% 46% / 6px 6px no-repeat,
+    radial-gradient(circle, var(--sky-star) 0 1.4px, transparent 1.9px) 96% 12% / 6px 6px no-repeat,
+    radial-gradient(circle, var(--sky-star) 0 0.9px, transparent 1.4px) 70% 60% / 6px 6px no-repeat,
+    radial-gradient(circle, var(--sky-star) 0 1px, transparent 1.5px) 40% 70% / 6px 6px no-repeat;
+  pointer-events: none;
+}
+.v-learn .learn-hero__moon {
+  position: absolute;
+  right: 18px;
+  top: 22px;
+}
+.v-learn .learn-hero__text { position: relative; max-width: calc(100% - 84px); }
+.v-learn .learn-hero__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sky-ink);
+}
+.v-learn .learn-hero__title {
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-xl);
+  line-height: 1.1;
+  color: var(--sky-ink);
+}
+.v-learn .learn-hero__horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 92%;
+  height: 1px;
+  background: var(--sky-mark);
+}
+
+/* Pastille d'icône des titres de section */
+.v-learn .learn-section__ico {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--cat-bg);
+  color: var(--cat-fg);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   En-tête et recherche
+   -------------------------------------------------------------------------- */
+.v-learn .learn-head p { max-width: 60ch; }
+
+.v-learn .learn-search__box { position: relative; }
+.v-learn .learn-search__input { padding-right: calc(var(--tap) + var(--space-1)); }
+.v-learn .learn-search__input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.v-learn .learn-search__clear {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+}
+
+/* --------------------------------------------------------------------------
+   Sections
+   -------------------------------------------------------------------------- */
+.v-learn .learn-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.v-learn .learn-section__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+  color: var(--ink);
+}
+.v-learn .learn-section__title { font-family: var(--font-display); font-weight: 400; font-size: var(--fs-lg); }
+.v-learn .learn-section__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Cartes d'articles (lien étiré sur le titre)
+   -------------------------------------------------------------------------- */
+.v-learn .learn-cards {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.v-learn .learn-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: var(--space-4) calc(var(--space-4) + 28px) var(--space-4) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--cat);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease), transform 220ms var(--ease-pop);
+}
+.v-learn .learn-card:hover { background: color-mix(in srgb, var(--cat) 9%, var(--surface)); }
+.v-learn .learn-card:focus-within { border-color: var(--brand); border-left-color: var(--cat); }
+@media (prefers-reduced-motion: no-preference) {
+  .v-learn .learn-card:hover { transform: translateY(-1px); }
+}
+.v-learn .learn-card__title {
+  font-size: var(--fs-base);
+  line-height: 1.35;
+}
+.v-learn .learn-card__link {
+  color: var(--ink);
+  text-decoration: none;
+}
+.v-learn .learn-card__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+.v-learn .learn-card__link:focus-visible { outline: none; }
+.v-learn .learn-card__link:focus-visible::after {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.v-learn .learn-card__summary {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.v-learn .learn-card__cat {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px 10px 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--cat-bg);
+  color: var(--cat-fg);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.v-learn .learn-card__chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  transform: translateY(-50%);
+  color: var(--muted);
+}
+
+/* « Pour commencer » : cartes mises en avant, lavis de la couleur de leur catégorie */
+.v-learn .learn-card--featured {
+  border-color: color-mix(in srgb, var(--cat) 40%, var(--line));
+  border-left-color: var(--cat);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cat) 16%, var(--surface)) 0%, var(--surface) 70%);
+}
+.v-learn .learn-card--featured .learn-card__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-md);
+}
+.v-learn .learn-card--featured:hover { background: color-mix(in srgb, var(--cat) 18%, var(--surface)); }
+
+/* --------------------------------------------------------------------------
+   Métadonnées : minutes de lecture, niveau de preuve
+   -------------------------------------------------------------------------- */
+.v-learn .learn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.v-learn .learn-meta__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.v-learn .learn-evidence { color: var(--ink); font-weight: 600; }
+.v-learn .learn-evidence__bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+.v-learn .learn-evidence__bar {
+  width: 4px;
+  border-radius: 1px;
+  background: var(--line-strong);
+  opacity: 0.35;
+}
+.v-learn .learn-evidence__bar:nth-child(1) { height: 5px; }
+.v-learn .learn-evidence__bar:nth-child(2) { height: 8px; }
+.v-learn .learn-evidence__bar:nth-child(3) { height: 12px; }
+.v-learn .learn-evidence__bar.is-on { background: var(--gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 45%, var(--ink)); opacity: 1; }
+
+/* --------------------------------------------------------------------------
+   Glossaire
+   -------------------------------------------------------------------------- */
+.v-learn .learn-glossary {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.v-learn .learn-glossary__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 600;
+  color: var(--brand);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius);
+}
+.v-learn .learn-glossary__summary::-webkit-details-marker { display: none; }
+.v-learn .learn-glossary__summary .icon { transition: transform var(--dur) var(--ease); }
+.v-learn .learn-glossary[open] .learn-glossary__summary .icon { transform: rotate(180deg); }
+.v-learn .learn-glossary[open] .learn-glossary__summary { border-bottom: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; }
+.v-learn .learn-glossary__list { margin: 0; padding: var(--space-1) var(--space-4); }
+.v-learn .learn-glossary__item {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+.v-learn .learn-glossary__item:first-child { border-top: 0; }
+.v-learn .learn-glossary__item dt { font-weight: 700; color: var(--ink); }
+.v-learn .learn-glossary__item dd {
+  margin: 2px 0 0;
+  max-width: 65ch;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+/* --------------------------------------------------------------------------
+   Contacts / numéros utiles
+   -------------------------------------------------------------------------- */
+.v-learn .learn-resources__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.v-learn .learn-contacts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.v-learn .learn-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--info);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.v-learn .learn-contact__label { font-weight: 700; line-height: 1.3; }
+.v-learn .learn-contact__phone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+.v-learn .learn-contact__number {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  -webkit-user-select: all;
+  user-select: all;
+}
+.v-learn .learn-contact__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.v-learn .learn-contact__actions .btn { min-height: var(--tap); }
+.v-learn .learn-contact__url {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  min-height: var(--tap);
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.v-learn .learn-contact__detail {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  max-width: 65ch;
+}
+.v-learn .learn-resources__checked {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.v-learn .learn-resources__checked .icon { color: var(--brand); margin-top: 1px; }
+
+.v-learn .learn-foot { max-width: 65ch; }
+
+/* --------------------------------------------------------------------------
+   Lecture d'un article
+   -------------------------------------------------------------------------- */
+.v-learn .learn-back { margin-left: calc(-1 * var(--space-2)); }
+
+.v-learn .learn-article { display: flex; flex-direction: column; gap: var(--space-5); }
+.v-learn .learn-article__head {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border-top: 5px solid var(--cat);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cat) 18%, var(--surface)) 0%, var(--surface) 75%);
+  box-shadow: var(--shadow-1);
+}
+.v-learn .learn-article__cat {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 12px 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--cat-bg);
+  color: var(--cat-fg);
+}
+.v-learn .learn-article__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-xl);
+  line-height: 1.15;
+  max-width: 22ch;
+  text-wrap: balance;
+}
+.v-learn .learn-article__lead {
+  max-width: 65ch;
+  color: var(--ink-2);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+.v-learn .learn-article .learn-meta { font-size: var(--fs-sm); }
+
+/* Corps du texte : ~65 caractères, interlignage confortable */
+.v-learn .learn-prose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 65ch;
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+.v-learn .learn-prose > .learn-prose__h {
+  margin-top: var(--space-3);
+  font-size: var(--fs-md);
+  line-height: 1.3;
+}
+.v-learn .learn-prose__list { display: flex; flex-direction: column; gap: var(--space-2); }
+.v-learn .learn-prose__list li::marker { color: var(--brand); }
+
+.v-learn .learn-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+  counter-reset: learn-step;
+}
+.v-learn .learn-steps li {
+  position: relative;
+  padding-left: 40px;
+  counter-increment: learn-step;
+  min-height: 28px;
+}
+.v-learn .learn-steps li::before {
+  content: counter(learn-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.v-learn .learn-callout { line-height: 1.55; }
+
+.v-learn .learn-table {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  -webkit-overflow-scrolling: touch;
+}
+.v-learn .learn-table table {
+  min-width: 480px;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.v-learn .learn-table th,
+.v-learn .learn-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+.v-learn .learn-table th {
+  background: var(--surface-2);
+  color: var(--ink);
+  font-weight: 700;
+}
+.v-learn .learn-table tbody tr:last-child td { border-bottom: 0; }
+.v-learn .learn-table td:first-child { font-weight: 600; color: var(--ink); }
+
+.v-learn .learn-sources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.v-learn .learn-sources__title { font-size: var(--fs-base); }
+.v-learn .learn-sources ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.v-learn .learn-sources li::marker { color: var(--muted); font-family: var(--font-mono); }
+.v-learn .learn-sources__link {
+  display: inline;
+  overflow-wrap: anywhere;
+}
+.v-learn .learn-sources__link .icon,
+.v-learn .learn-contact__url .icon {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-left: 3px;
+}
+
+.v-learn .learn-related { padding-top: var(--space-2); }
+
+@media (min-width: 560px) {
+  .v-learn .learn-article__title { font-size: var(--fs-2xl); }
+}
+
+@media (forced-colors: active) {
+  .v-learn .learn-hero { border: 1px solid CanvasText; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v-learn .learn-card,
+  .v-learn .learn-glossary__summary .icon { transition: none; }
+}

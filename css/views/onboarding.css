@@ -1,0 +1,435 @@
+/* Lune — vue Premier lancement (js/ui/views/onboarding.js). « Ciel de Lune ».
+   Racine : .v-onb. Tokens et composants partagés : css/app.css. Aucune couleur littérale.
+   Chaque étape a un petit ciel illustratif (.v-onb__sky, décor aria-hidden, aucun texte dessus)
+   et une barre de progression dorée. Jamais de vert hors décision (S5). */
+
+.v-onb {
+  /* Encre posée sur un aplat pastel (--ph-*, --gold) : foncée dans les deux thèmes. */
+  --on-pastel: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) .v-onb { --on-pastel: var(--brand-ink); }
+}
+:root[data-theme="sombre"] .v-onb { --on-pastel: var(--brand-ink); }
+
+.v-onb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   En-tête : étape, barre de progression, titre
+   -------------------------------------------------------------------------- */
+.v-onb__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.v-onb__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--brand);
+}
+.v-onb__brand .icon { color: var(--gold); fill: currentColor; stroke: color-mix(in srgb, var(--gold) 55%, var(--ink)); }
+
+/* Petit ciel de l'étape : fond --sky (horizon à 81,7 %), aucun texte posé dessus */
+.v-onb__sky {
+  position: relative;
+  aspect-ratio: 343 / 110;
+  border-radius: 24px 24px 14px 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.v-onb__sky-svg { display: block; width: 100%; height: 100%; overflow: hidden; }
+.v-onb__star { fill: var(--sky-star); }
+.v-onb__sky-under { fill: none; stroke: var(--sky-line); stroke-width: 9; stroke-linecap: round; }
+.v-onb__sky-seg { fill: none; stroke-width: 5; stroke-linecap: round; }
+.v-onb__sky-seg--regles { stroke: var(--ph-regles); }
+.v-onb__sky-seg--folliculaire { stroke: var(--ph-foll); }
+.v-onb__sky-seg--ovulatoire { stroke: var(--ph-ovu); }
+.v-onb__sky-seg--luteale { stroke: var(--ph-lut); }
+.v-onb__sky-seg--future { stroke-dasharray: 0.1 8; stroke-width: 4.5; }
+.v-onb__sea { fill: var(--sky-sea); }
+.v-onb__horizon { stroke: var(--sky-mark); stroke-width: 1; }
+.v-onb__moon .moon__halo { fill: var(--moon-glow); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .v-onb__moon--rise { animation: onb-rise 1100ms var(--ease) both; }
+  .v-onb__star--twinkle { animation: lune-twinkle 4.5s ease-in-out infinite; }
+}
+@keyframes onb-rise {
+  from { transform: translateY(24px); }
+  to { transform: none; }
+}
+
+/* Barre de progression dorée (l'étape est aussi écrite en toutes lettres au-dessus) */
+.v-onb__progress {
+  position: relative;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.v-onb__progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 10px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 70%, var(--ph-foll)), var(--gold));
+  /* liseré plus foncé : la barre se lit sur la piste (≥ 3:1) dans les deux thèmes */
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--gold) 45%, var(--ink));
+  transition: width 420ms var(--ease-pop);
+}
+.v-onb__progress-fill::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 4.5px color-mix(in srgb, var(--gold) 45%, var(--ink));
+}
+.v-onb__title {
+  font-size: var(--fs-xl);
+  color: var(--ink);
+  margin: 0;
+}
+.v-onb__title:focus { outline: none; }
+.v-onb__title:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+
+.v-onb__body { display: flex; flex-direction: column; }
+.v-onb__body p { margin: 0; }
+.v-onb__lead {
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.v-onb__prose p { line-height: 1.5; color: var(--ink-2); }
+.v-onb__optional { font-weight: 400; color: var(--muted); }
+
+/* --------------------------------------------------------------------------
+   Points illustrés et listes
+   -------------------------------------------------------------------------- */
+.v-onb__points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.v-onb__point {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+.v-onb__point-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--brand);
+  color: var(--surface);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 12%, transparent);
+}
+/* Couleurs par sujet : or (carnet), indigo (température, double contrôle), lavande (apprentissage),
+   abricot (prévisions) ; la protection garde son code chaud (bouclier sur fond braise doux). */
+.v-onb__point-icon--edit { background: var(--gold); color: color-mix(in srgb, var(--gold) 22%, var(--on-pastel)); }
+.v-onb__point-icon--thermo { background: var(--temp); color: var(--surface); }
+.v-onb__point-icon--book { background: var(--ph-lut); color: color-mix(in srgb, var(--ph-lut) 22%, var(--on-pastel)); }
+.v-onb__point-icon--calendar { background: var(--ph-foll); color: color-mix(in srgb, var(--ph-foll) 22%, var(--on-pastel)); }
+.v-onb__point-icon--shield {
+  background: repeating-linear-gradient(135deg, var(--protect-hatch-soft) 0 6px, transparent 6px 12px), var(--protect-soft);
+  color: var(--protect-deep);
+  box-shadow: inset 0 0 0 1.5px var(--protect-deep);
+}
+.v-onb__point-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v-onb__point-title { font-weight: 700; line-height: 1.3; color: var(--ink); }
+.v-onb__point-text { color: var(--ink-2); line-height: 1.45; }
+
+.v-onb__local {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+.v-onb__local > .icon { color: var(--brand); margin-top: 2px; }
+
+.v-onb__list,
+.v-onb__options,
+.v-onb__steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  line-height: 1.45;
+}
+.v-onb__list--small { font-size: var(--fs-sm); color: var(--ink-2); }
+.v-onb__options > li::marker { color: var(--danger); }
+.v-onb__steps > li::marker { font-family: var(--font-mono); font-weight: 700; color: var(--brand); }
+.v-onb__steps .icon { vertical-align: -3px; color: var(--brand); }
+
+.v-onb__h-icon { display: flex; align-items: center; gap: var(--space-2); }
+.v-onb__h-icon .icon { color: var(--brand); }
+
+.v-onb__inline-btn { align-self: flex-start; }
+
+/* --------------------------------------------------------------------------
+   Choix (cartes à bascule)
+   -------------------------------------------------------------------------- */
+.v-onb__choices { display: flex; flex-direction: column; gap: var(--space-2); }
+.v-onb__choice {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.v-onb__choice:hover { background: var(--surface-2); }
+.v-onb__choice.is-on {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  box-shadow: inset 0 0 0 1px var(--brand), var(--shadow-1);
+}
+.v-onb__choice-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+}
+.v-onb__choice.is-on .v-onb__choice-mark {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+.v-onb__choice-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v-onb__choice-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.v-onb__choice-hint { font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.4; }
+.v-onb__reco { min-height: 22px; padding: 1px 8px; }
+
+/* Case à cocher sur toute la largeur */
+.v-onb__check {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  min-height: var(--tap);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.v-onb__check.is-on { border-color: var(--brand); background: var(--brand-soft); }
+.v-onb__check input { margin-top: 1px; accent-color: var(--brand); }
+.v-onb__check .hint { font-weight: 400; }
+
+/* Date + heure côte à côte quand la place le permet */
+.v-onb__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+@media (min-width: 420px) {
+  .v-onb__pair { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+}
+.v-onb__input-short { font-family: var(--font-mono); }
+
+/* --------------------------------------------------------------------------
+   Tableau d'efficacité
+   -------------------------------------------------------------------------- */
+.v-onb__table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  -webkit-overflow-scrolling: touch;
+}
+.v-onb__table-wrap:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.v-onb__table {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+}
+.v-onb__table th,
+.v-onb__table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.v-onb__table thead th {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background: var(--surface-2);
+}
+.v-onb__table tbody th { font-weight: 600; color: var(--ink); }
+.v-onb__table td { color: var(--ink-2); }
+.v-onb__table td.mono { color: var(--ink); font-weight: 700; white-space: normal; }
+.v-onb__table tbody tr:last-child > * { border-bottom: 0; }
+
+/* --------------------------------------------------------------------------
+   Aide à l'identification du stérilet
+   -------------------------------------------------------------------------- */
+.v-onb__details { padding: 0; }
+.v-onb__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 700;
+  color: var(--brand);
+  cursor: pointer;
+  list-style: none;
+}
+.v-onb__summary::-webkit-details-marker { display: none; }
+.v-onb__summary::after {
+  content: '';
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--dur) var(--ease);
+}
+.v-onb__details[open] > .v-onb__summary::after { transform: rotate(-135deg); }
+.v-onb__details-body { padding: 0 var(--space-4) var(--space-4); }
+.v-onb__devices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.v-onb__device {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+.v-onb__device-text { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v-onb__device-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Récapitulatif, démo
+   -------------------------------------------------------------------------- */
+.v-onb__recap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.v-onb__recap dt { color: var(--muted); }
+.v-onb__recap dd { margin: 0; font-weight: 600; color: var(--ink); }
+
+.v-onb__settings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  line-height: 1.45;
+}
+.v-onb__settings li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: var(--space-2);
+  align-items: start;
+}
+.v-onb__settings .icon { margin-top: 3px; color: var(--brand); }
+
+.v-onb__demo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+/* --------------------------------------------------------------------------
+   Erreur et navigation
+   -------------------------------------------------------------------------- */
+.v-onb__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+.v-onb__error .icon { flex: none; margin-top: 1px; color: var(--danger); }
+
+.v-onb__nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: auto calc(-1 * var(--gutter)) 0;
+  padding: var(--space-3) var(--gutter) calc(var(--space-3) + var(--safe-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.v-onb__nav-spacer { flex: 1; }
+.v-onb__next { flex: 1 1 auto; max-width: 320px; margin-left: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v-onb__progress-fill, .v-onb__choice, .v-onb__summary::after { transition: none; }
+}
+@media (forced-colors: active) {
+  .v-onb__progress-fill { background: Highlight; }
+}

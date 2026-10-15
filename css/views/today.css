@@ -1,0 +1,1012 @@
+/* Lune — vue « Aujourd'hui » (js/ui/views/today.js). Classe racine : .v-today.
+   Direction « Ciel de Lune ». Tokens et composants partagés (.sky, .st, .dawn-bar, .today-ring,
+   .card--forecast…) : css/app.css. Aucune couleur littérale ici.
+   Sécurité visuelle : la DÉCISION peint les cartes et les cases (S1) ; le tireté est réservé aux
+   prévisions (S2) ; les règles ne sont qu'un marqueur (S3) ; le ciel n'est qu'un décor. */
+
+/* --------------------------------------------------------------------------
+   1. Héros « ciel » : dégradé de la phase (.sky), arc + lune (skyArcSvg), texte HTML par-dessus.
+   Géométrie : aspect-ratio 343/262, horizon à 81,7 %. Le texte reste dans les 60 % du haut
+   (--sky-ink) ou sur la « mer » sous l'horizon (--sea-ink), jamais sur la bande 62–82 % (S6).
+   -------------------------------------------------------------------------- */
+.v-today .v-today-hero {
+  position: relative;
+  container-type: inline-size;
+  width: 100%;
+  max-width: 520px;
+  margin-inline: auto;
+  aspect-ratio: 343 / 262;
+  border-radius: 28px 28px 18px 18px;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--sky-top) 75%, transparent);
+}
+.v-today .v-today-hero__art { position: absolute; inset: 0; }
+.v-today .v-today-hero__art .sky-arc { width: 100%; height: 100%; }
+
+.v-today .v-today-hero__top {
+  position: absolute;
+  top: 5%;
+  left: 5%;
+  right: 4%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.v-today .v-today-hero__date {
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.v-today .v-today-hero__pill {
+  flex: none;
+  padding: 3px 11px;
+  border: 1.5px solid color-mix(in srgb, var(--sky-ink) 45%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+/* « Jour 20 du cycle » au creux de l'arc : ancré par le bas à 60 % de la hauteur.
+   Tailles en cqw (proportionnelles au héros) : le texte garde sa place par rapport à l'arc
+   et à la lune, quelle que soit la largeur (343 px de référence : 51 px et 12,5 px). */
+.v-today .v-today-hero__day {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 40.5%;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1.2cqw;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: clamp(12px, 3.65cqw, 18px);
+  font-weight: 700;
+  line-height: 0.8;
+  letter-spacing: 0;
+  color: var(--sky-ink);
+}
+.v-today .v-today-hero__num {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(40px, 14.8cqw, var(--fs-hero));
+  letter-spacing: -0.03em;
+  font-variant-numeric: lining-nums;
+}
+
+/* « Mer » sous l'horizon : repères J1 / Jn et phase indicative. */
+.v-today .v-today-hero__sea {
+  position: absolute;
+  top: 82.5%;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 19%;
+  color: var(--sea-ink);
+}
+.v-today .v-today-hero__end {
+  position: absolute;
+  top: 50%;
+  font-size: 0.75rem;
+  transform: translate(-50%, -50%);
+}
+.v-today .v-today-hero__end--start { left: 12.7%; }
+.v-today .v-today-hero__end--end { left: 87.3%; }
+.v-today .v-today-hero__phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+.v-today .v-today-hero__note { font-weight: 400; }
+.v-today .v-today-hero__dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea-ink) 22%, transparent);
+}
+.v-today .v-today-hero__dot--regles { background: var(--ph-regles); }
+.v-today .v-today-hero__dot--foll { background: var(--ph-foll); }
+.v-today .v-today-hero__dot--ovu { background: var(--ph-ovu); }
+.v-today .v-today-hero__dot--lut { background: var(--ph-lut); }
+.v-today .v-today-hero__dot--none { background: var(--sky-mark); }
+
+/* Entrée discrète de la lune (aucune information ne dépend de l'animation). */
+@media (prefers-reduced-motion: no-preference) {
+  .v-today .v-today-hero .sky-arc > .moon {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: v-today-moonrise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+@keyframes v-today-moonrise {
+  from { opacity: 0.35; transform: translateY(12px) scale(0.75); }
+}
+
+/* --------------------------------------------------------------------------
+   2. Carte décision : 3 aspects, tous tirés de protectionNeeded.
+   --protect : aplat braise hachuré, bouclier dans un carré.
+   --mixed   : bandeau « protection » + frise 0–24 h (hachuré puis uni), bord braise.
+   --safe    : menthe pâle unie, coche dans un disque, bord 2 px.
+   --pre     : idem, teinte plus claire, coche cerclée, bord PLEIN (jamais tireté : S2).
+   -------------------------------------------------------------------------- */
+.v-today .v-today-decision {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.v-today .v-today-decision__band { padding: var(--space-4) var(--space-4) 0; }
+.v-today .v-today-decision__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.v-today .v-today-decision__top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.v-today .v-today-decision__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+}
+.v-today .v-today-decision__icon .icon { stroke-width: 2.2; }
+.v-today .v-today-decision__heading { min-width: 0; padding-top: 1px; }
+.v-today .v-today-decision__eyebrow { color: inherit; opacity: 1; }
+.v-today .v-today-decision__title {
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.12;
+  letter-spacing: -0.005em;
+  color: inherit;
+  overflow-wrap: break-word;
+}
+.v-today .v-today-decision__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.v-today .v-today-decision__switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.v-today .v-today-decision__switch .icon { flex: none; margin-top: 2px; }
+.v-today .v-today-decision__detail { font-size: 0.9375rem; }
+.v-today .v-today-decision__rules {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+.v-today .v-today-decision__rules p { flex-basis: 100%; color: var(--ink); }
+.v-today .v-today-decision__rules-label { font-weight: 700; color: var(--ink-2); }
+.v-today .v-today-decision__rules .badge { max-width: 100%; white-space: normal; text-align: left; }
+.v-today .v-today-decision__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.v-today .v-today-decision__badges .badge { white-space: normal; text-align: left; }
+.v-today .v-today-decision__note { font-size: var(--fs-sm); }
+.v-today .v-today-decision__how {
+  align-self: flex-start;
+  min-height: var(--tap);
+  padding-inline: 14px;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+}
+
+/* Protection : aplat braise hachuré (bandes 7 / 15 px, S4) */
+.v-today .v-today-decision--protect {
+  color: var(--protect-ink);
+  background: repeating-linear-gradient(135deg, var(--protect-hatch) 0 7px, transparent 7px 15px), var(--protect);
+}
+.v-today .v-today-decision--protect .v-today-decision__icon,
+.v-today .v-today-decision--mixed .v-today-decision__icon {
+  background: var(--protect-ink);
+  color: var(--protect);
+}
+.v-today .v-today-decision--protect .v-today-decision__how {
+  border: 0;
+  background: var(--protect-ink);
+  color: var(--protect-deep);
+}
+.v-today .v-today-decision--protect .v-today-decision__how:hover { background: var(--protect-soft); }
+
+/* Bascule à 18 h : bandeau « protection », puis surface avec la frise */
+.v-today .v-today-decision--mixed {
+  border: 2px solid var(--protect);
+  background: var(--surface);
+  color: var(--ink);
+}
+.v-today .v-today-decision--mixed .v-today-decision__band {
+  padding-bottom: var(--space-4);
+  color: var(--protect-ink);
+  background: repeating-linear-gradient(135deg, var(--protect-hatch) 0 7px, transparent 7px 15px), var(--protect);
+}
+.v-today .v-today-decision--mixed .v-today-decision__main { padding-top: var(--space-4); }
+.v-today .v-today-decision--mixed .v-today-decision__switch { color: var(--safe-text); }
+.v-today .v-today-decision--mixed .v-today-decision__note { color: var(--ink-2); }
+.v-today .v-today-decision--mixed .v-today-decision__how {
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* Pas de protection selon les règles : calme, uni, coche dans un disque */
+.v-today .v-today-decision--safe {
+  border: 2px solid var(--safe-line);
+  background: var(--safe-soft);
+  color: var(--safe-text);
+  box-shadow: none;
+}
+.v-today .v-today-decision--safe .v-today-decision__icon {
+  border-radius: 50%;
+  background: var(--safe);
+  color: var(--safe-ink);
+}
+.v-today .v-today-decision--pre {
+  border: 2px solid var(--safe-pre);
+  background: var(--safe-pre-soft);
+  color: var(--safe-pre-text);
+  box-shadow: none;
+}
+.v-today .v-today-decision--pre .v-today-decision__icon {
+  border: 2px solid var(--safe-pre);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--safe-pre);
+}
+.v-today .v-today-decision--pre .v-today-decision__icon .icon {
+  width: 32px;
+  height: 32px;
+  padding: 3px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+.v-today .v-today-decision--safe .v-today-decision__title,
+.v-today .v-today-decision--pre .v-today-decision__title { font-size: 1.375rem; }
+.v-today .v-today-decision--safe .v-today-decision__how,
+.v-today .v-today-decision--pre .v-today-decision__how {
+  border: 1.5px solid currentColor;
+  background: var(--surface);
+  color: inherit;
+}
+
+/* Frise 0 h → 24 h */
+.v-today .v-today-switchbar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink);
+}
+.v-today .v-today-decision--protect .v-today-switchbar {
+  padding: var(--space-2) var(--space-3);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.v-today .v-today-switchbar__track {
+  display: flex;
+  height: 36px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.v-today .v-today-switchbar__seg {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.v-today .v-today-switchbar__seg .icon { stroke-width: 2.3; }
+.v-today .v-today-switchbar__seg--before,
+.v-today .v-today-switchbar__seg--held {
+  color: var(--protect-ink);
+  background: repeating-linear-gradient(135deg, var(--protect-hatch) 0 6px, transparent 6px 12px), var(--protect);
+}
+.v-today .v-today-switchbar__seg--before { flex: 0 0 75%; padding-left: var(--space-2); }
+.v-today .v-today-switchbar__seg--after,
+.v-today .v-today-switchbar__seg--held {
+  flex: 1;
+  justify-content: center;
+  border-left: 3px solid var(--ink);
+}
+.v-today .v-today-switchbar__seg--after { background: var(--safe-soft); color: var(--safe); }
+.v-today .v-today-switchbar__scale {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.v-today .v-today-switchbar__mark {
+  position: absolute;
+  left: 75%;
+  transform: translateX(-50%);
+  font-weight: 700;
+  color: var(--ink);
+}
+.v-today .v-today-switchbar__caption { font-size: var(--fs-xs); font-weight: 700; color: var(--ink); }
+
+/* --------------------------------------------------------------------------
+   3. À noter aujourd'hui (+ série de matins mesurés)
+   -------------------------------------------------------------------------- */
+.v-today .v-today-todo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.v-today .v-today-todo__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.v-today .v-today-todo__titles { min-width: 0; }
+.v-today .v-today-todo__lead { margin-top: 2px; font-size: var(--fs-sm); color: var(--ink-2); }
+.v-today .v-today-todo__count {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 2px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.v-today .v-today-todo__count.is-done { background: var(--brand); color: var(--brand-ink); }
+.v-today .v-today-todo__bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.v-today .v-today-todo__fill {
+  display: block;
+  height: 100%;
+  min-width: 6px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand) 0 75%, var(--gold));
+}
+.v-today .v-today-todo__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.v-today .v-today-todo__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+.v-today .v-today-todo__item:hover { border-color: var(--brand); }
+.v-today .v-today-todo__item.is-done {
+  border-color: transparent;
+  background: var(--surface-2);
+}
+.v-today .v-today-todo__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.v-today .v-today-todo__item.is-done .v-today-todo__icon { background: var(--brand); color: var(--brand-ink); }
+.v-today .v-today-todo__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.v-today .v-today-todo__label { font-weight: 700; }
+.v-today .v-today-todo__value {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.v-today .v-today-todo__item.is-todo .v-today-todo__value { color: var(--muted); }
+.v-today .v-today-todo__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.v-today .v-today-todo__item.is-todo .v-today-todo__state {
+  padding: 3px 10px;
+  border: 1.5px solid var(--brand);
+  border-radius: var(--radius-pill);
+  color: var(--brand);
+}
+.v-today .v-today-todo__check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ok);
+  color: var(--brand-ink);
+}
+.v-today .v-today-todo__check .icon { stroke-width: 2.6; }
+.v-today .v-today-todo__next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.v-today .v-today-todo__next-title { font-size: var(--fs-sm); color: var(--ink); }
+.v-today .v-today-todo__next ul { display: flex; flex-direction: column; gap: 2px; }
+
+/* Série : récompense douce, jamais culpabilisante */
+.v-today .v-today-streak {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+}
+.v-today .v-today-streak__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 12px 3px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+.v-today .v-today-streak__star {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--brand);
+}
+.v-today .v-today-streak__star .icon path { fill: var(--gold); }
+.v-today .v-today-streak__note { font-size: var(--fs-xs); color: var(--muted); }
+
+/* --------------------------------------------------------------------------
+   4. Bande de 7 jours : pastille = décision (S1), pointillé = prévision (S2),
+   règles = barre aube sous la pastille (S3), aujourd'hui = anneau de marque.
+   -------------------------------------------------------------------------- */
+.v-today .v-today-week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 14px 12px 12px;
+}
+.v-today .v-today-week__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-left: 4px;
+}
+.v-today .v-today-week__list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.v-today .v-today-week__item { display: flex; min-width: 0; }
+.v-today .v-today-week__cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 104px;
+  padding: 6px 0 7px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.15;
+  text-align: center;
+}
+.v-today button.v-today-week__cell:not(.is-today):hover { background: var(--surface-2); }
+.v-today .v-today-week__wd { font-size: 0.75rem; color: var(--muted); }
+.v-today .v-today-week__dn {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.v-today .v-today-week__cell .st { width: min(40px, 94%); height: auto; aspect-ratio: 1; }
+.v-today .v-today-week__abbr {
+  max-width: 100%;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.v-today .v-today-week__mark { display: block; width: 22px; height: 5px; }
+.v-today .v-today-week__mark.dawn-bar--forecast { height: 6px; }
+.v-today .v-today-week__cell.is-today .v-today-week__wd { font-weight: 700; color: var(--ink-2); }
+.v-today .v-today-week__cell.is-today .v-today-week__abbr { font-weight: 700; color: var(--brand); }
+.v-today .v-today-week__cell--future .v-today-week__dn { color: var(--muted); }
+.v-today .v-today-week__st-none { border: 1.5px solid var(--line-strong); color: var(--muted); }
+
+.v-today .v-today-week__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 4px 4px 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+}
+.v-today .v-today-week__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.v-today .v-today-week__legend-bar { width: 18px; }
+.v-today .v-today-week__hint { padding-inline: 4px; font-size: 0.75rem; color: var(--muted); }
+
+/* Lien texte de section (≥ 44 px de haut) */
+.v-today .v-today-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--tap);
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.v-today .v-today-link:hover { text-decoration: underline; }
+
+/* --------------------------------------------------------------------------
+   5. Mini-courbe (couleurs du thème : --temp, --coverline, --brand)
+   -------------------------------------------------------------------------- */
+.v-today .v-today-curve {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.v-today .v-today-curve__btn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+.v-today .v-today-curve__svg {
+  width: 100%;
+  max-width: 560px;
+  height: auto;
+  margin: 0 auto;
+  overflow: visible;
+}
+.v-today .v-today-curve__grid { stroke: var(--grid-strong); stroke-width: 1; }
+.v-today .v-today-curve__grid.is-major { stroke: var(--line); }
+.v-today .v-today-curve__axis {
+  fill: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.v-today .v-today-curve__area { fill: color-mix(in srgb, var(--temp) 11%, transparent); }
+.v-today .v-today-curve__line {
+  fill: none;
+  stroke: var(--temp);
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.v-today .v-today-curve__pt {
+  fill: var(--temp);
+  stroke: var(--surface);
+  stroke-width: 1.25;
+}
+.v-today .v-today-curve__pt.is-excluded {
+  fill: var(--surface);
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+.v-today .v-today-curve__num {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.v-today .v-today-curve__coverline {
+  stroke: var(--coverline);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.v-today .v-today-curve__coverline-label {
+  fill: var(--coverline);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+.v-today .v-today-curve__today {
+  stroke: var(--brand);
+  stroke-width: 1.25;
+  stroke-dasharray: 2 3;
+}
+.v-today .v-today-curve__today-label {
+  fill: var(--brand);
+  font-size: 10px;
+  font-weight: 700;
+}
+.v-today .v-today-curve__more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.v-today .v-today-curve__legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.v-today .v-today-curve__key { display: inline-block; margin-right: -4px; }
+.v-today .v-today-curve__key--pt {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--temp);
+}
+.v-today .v-today-curve__key--excluded {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+}
+.v-today .v-today-curve__key--line { width: 16px; border-top: 2px dashed var(--coverline); }
+.v-today .v-today-curve__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--tap);
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--brand);
+}
+.v-today .v-today-curve__btn:hover .v-today-curve__link { text-decoration: underline; }
+
+/* --------------------------------------------------------------------------
+   6. Prévisions : carte tiretée + trame de points (.card--forecast), « INDICATIF »
+   -------------------------------------------------------------------------- */
+.v-today .v-today-pred {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.v-today .v-today-pred__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.v-today .v-today-pred__icon { display: inline-flex; color: var(--forecast); }
+.v-today .v-today-pred__tag {
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px dashed var(--forecast);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.v-today .v-today-pred__label {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--forecast);
+  border-radius: 0 12px 12px 0;
+  background: var(--bg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink);
+}
+.v-today .v-today-pred__late {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink);
+}
+.v-today .v-today-pred__late .icon { flex: none; margin-top: 1px; color: var(--warn); }
+.v-today .v-today-pred__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+.v-today .v-today-pred__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) 10px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+.v-today .v-today-pred__row dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.v-today .v-today-pred__row dd {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 0 34px;
+}
+.v-today .v-today-pred__mk {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+.v-today .v-today-pred__mk .dawn-bar { width: 20px; }
+.v-today .v-today-pred__main { font-weight: 700; color: var(--ink); }
+.v-today .v-today-pred__range { font-size: var(--fs-sm); color: var(--muted); }
+.v-today .v-today-pred__meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+.v-today .v-today-pred__msg { font-size: var(--fs-sm); color: var(--ink-2); }
+.v-today .v-today-pred__note { font-size: var(--fs-sm); font-style: italic; color: var(--muted); }
+
+/* --------------------------------------------------------------------------
+   7. Alertes
+   -------------------------------------------------------------------------- */
+.v-today .v-today-alerts__text { font-size: var(--fs-sm); color: var(--ink-2); }
+.v-today .v-today-alerts__action {
+  min-height: var(--tap);
+  margin-top: var(--space-1);
+  background: var(--surface);
+}
+
+/* --------------------------------------------------------------------------
+   8. Conseil du jour : liseré peint avec le ciel de la phase
+   -------------------------------------------------------------------------- */
+.v-today .v-today-tip {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  overflow: hidden;
+  padding-left: 20px;
+}
+.v-today .v-today-tip::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 5px;
+  border-radius: 0 4px 4px 0;
+  background: var(--sky);
+}
+.v-today .v-today-tip__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.v-today .v-today-tip__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.v-today .v-today-tip__eyebrow { color: var(--muted); }
+.v-today .v-today-tip__text { font-size: 0.9375rem; color: var(--ink); }
+.v-today .v-today-tip__more { align-self: flex-start; margin-left: -4px; }
+
+/* --------------------------------------------------------------------------
+   9. Lien urgence (bouée, jamais le bouclier)
+   -------------------------------------------------------------------------- */
+.v-today .v-today-urgence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 60px;
+  padding: 10px var(--space-4) 10px 10px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+}
+.v-today .v-today-urgence:hover { background: var(--surface-2); }
+.v-today .v-today-urgence__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.v-today .v-today-urgence__text { flex: 1; min-width: 0; }
+.v-today .v-today-urgence > .icon:last-child { color: var(--muted); }
+
+/* --------------------------------------------------------------------------
+   État vide
+   -------------------------------------------------------------------------- */
+.v-today .v-today-empty { color: var(--ink-2); gap: var(--space-3); }
+.v-today .v-today-empty__moon { display: grid; place-items: center; }
+.v-today .v-today-empty__title { color: var(--ink); }
+.v-today .v-today-empty__strong { font-weight: 700; color: var(--ink); }
+.v-today .v-today-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* --------------------------------------------------------------------------
+   Feuille « Comment c'est calculé ? » (rendue hors de la vue : .v-today.v-today-explain)
+   -------------------------------------------------------------------------- */
+.v-today.v-today-explain { gap: var(--space-4); }
+.v-today .v-today-explain__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.v-today .v-today-explain__sec:first-child { padding-top: 0; border-top: 0; }
+.v-today .v-today-explain__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-base);
+}
+.v-today .v-today-explain__title .icon { color: var(--brand); }
+.v-today .v-today-explain__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+.v-today .v-today-explain__fact {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+}
+.v-today .v-today-explain__fact dt { color: var(--muted); }
+.v-today .v-today-explain__fact dd { margin: 0; font-weight: 600; color: var(--ink); }
+.v-today .v-today-explain__group { display: flex; flex-direction: column; gap: 6px; }
+.v-today .v-today-explain__label { font-size: var(--fs-sm); font-weight: 700; }
+.v-today .v-today-explain__vals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.v-today .v-today-explain__val {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 10px 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  font-size: var(--fs-xs);
+}
+.v-today .v-today-explain__num {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--temp);
+  color: var(--surface);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.v-today .v-today-explain__note { font-size: var(--fs-sm); color: var(--ink-2); }
+.v-today .v-today-explain__note.muted { color: var(--muted); }
+.v-today .v-today-explain__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+
+/* --------------------------------------------------------------------------
+   Grands écrans
+   -------------------------------------------------------------------------- */
+@media (min-width: 480px) {
+  .v-today .v-today-decision__band { padding: var(--space-5) var(--space-5) 0; }
+  .v-today .v-today-decision__main { padding: var(--space-3) var(--space-5) var(--space-5); }
+  .v-today .v-today-decision--mixed .v-today-decision__band { padding-bottom: var(--space-5); }
+  .v-today .v-today-decision__title { font-size: 1.75rem; }
+  .v-today .v-today-week { padding-inline: var(--space-4); }
+  .v-today .v-today-week__abbr, .v-today .v-today-week__wd { font-size: var(--fs-xs); }
+}
+
+@media (forced-colors: active) {
+  .v-today .v-today-hero { border: 1px solid CanvasText; }
+  .v-today .v-today-decision, .v-today .v-today-urgence, .v-today .v-today-todo__item { border: 1px solid CanvasText; }
+  .v-today .v-today-week__cell.is-today { outline: 2px solid CanvasText; }
+}

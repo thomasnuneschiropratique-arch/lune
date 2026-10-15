@@ -1,0 +1,449 @@
+/* Lune — vue Cycles : feuille de relevé symptothermique, « comment c'est calculé »,
+   statistiques et historique (js/ui/views/cycles.js).
+   Racine : .v-cycles ; feuille « détail du jour » (ajoutée à <body>) : .v-cycles-sheet.
+   Les éléments SVG utilisent des classes .cy-* toujours sous .v-cycles.
+   Couleurs : tokens de css/app.css uniquement (« Ciel de Lune »).
+   Sécurité visuelle : rangées État / Décision peintes selon la décision (S1), hachures
+   à bandes de 6 px (S4), aucun tireté hors prévisions (S2), aucun vert hors --safe* (S5). */
+
+/* --------------------------------------------------------------------------
+   Sélecteur de cycle
+   -------------------------------------------------------------------------- */
+.v-cycles__selector {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+/* Liseré de ciel en haut (décor) */
+.v-cycles__selector::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--ph-regles), var(--ph-foll), var(--ph-ovu), var(--ph-lut));
+}
+.v-cycles__selector .iconbtn { background: var(--surface-2); color: var(--ink); }
+.v-cycles__selector .iconbtn:hover:not([disabled]) { background: var(--brand-soft); color: var(--brand); }
+.v-cycles__selector .iconbtn[disabled] { opacity: 0.35; cursor: not-allowed; background: transparent; }
+.v-cycles__selector-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+/* Mini-ciel de la phase en cours, avec la lune */
+.v-cycles__sky.sky {
+  flex: none;
+  display: inline-grid;
+  place-items: start center;
+  width: 54px;
+  height: 64px;
+  padding-top: 3px;
+  border-radius: 16px 16px 10px 10px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.v-cycles__selector-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+.v-cycles__selector-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  line-height: 1.25;
+  color: var(--ink);
+}
+.v-cycles__selector-range { font-size: var(--fs-sm); color: var(--ink-2); }
+.v-cycles__selector-text .badge { margin-top: 2px; }
+
+/* --------------------------------------------------------------------------
+   Courbe : colonne d'axe fixe + zone à défilement horizontal
+   -------------------------------------------------------------------------- */
+.v-cycles__chartcard { padding-left: var(--space-3); padding-right: var(--space-3); }
+.v-cycles__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--fs-xs);
+}
+.v-cycles__chart {
+  display: flex;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.v-cycles__axis {
+  flex: none;
+  max-width: none;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+.v-cycles__scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.v-cycles__scroll:focus-visible { outline-offset: -3px; }
+.v-cycles__scroll > svg { max-width: none; }
+
+.v-cycles svg text {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  fill: var(--ink-2);
+}
+
+/* Fonds */
+.v-cycles .cy-future { fill: var(--surface-2); opacity: 0.6; }
+.v-cycles .cy-zone { fill: var(--safe-soft); }
+.v-cycles text.cy-zone-label { font-family: var(--font-body); font-size: 11px; font-weight: 700; fill: var(--safe-text); }
+/* Double contrôle confirmé mais protection maintenue (cycle 0, apprentissage, strict, CU, non évaluable, LH) :
+   braise pâle hachurée (code protection), jamais la menthe pleine. */
+.v-cycles .cy-zone--learn { fill: var(--protect-soft); }
+.v-cycles .cy-zone-hatch { pointer-events: none; }
+.v-cycles text.cy-zone-label--learn { fill: var(--protect-deep); }
+.v-cycles .cy-today { fill: var(--brand-soft); stroke: var(--brand); stroke-width: 1.5; opacity: 0.9; }
+
+/* Quadrillage */
+.v-cycles .cy-grid { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+.v-cycles .cy-grid--strong { stroke: var(--grid-strong); }
+.v-cycles .cy-rowline { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+
+/* Axe et libellés de rangées */
+.v-cycles text.cy-axis-label { font-size: 10.5px; fill: var(--muted); }
+.v-cycles text.cy-axis-unit { font-size: 10.5px; font-weight: 700; fill: var(--temp); }
+.v-cycles text.cy-row-label { font-family: var(--font-body); font-size: 11px; font-weight: 700; fill: var(--ink-2); }
+
+/* Courbe : indigo / lavande, aire dégradée dessous */
+.v-cycles .cy-area { pointer-events: none; }
+.v-cycles .cy-area-stop { stop-color: var(--temp); stop-opacity: 0.14; }
+.v-cycles .cy-area-stop--end { stop-opacity: 0; }
+.v-cycles .cy-line { fill: none; stroke: var(--temp); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.v-cycles .cy-pt { fill: var(--temp); stroke: var(--surface); stroke-width: 1.5; }
+.v-cycles .cy-pt--ignored { fill: var(--surface); stroke: var(--temp); stroke-width: 2; }
+.v-cycles .cy-pt--excluded { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+.v-cycles .cy-pt-slash { stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; }
+.v-cycles .cy-ring--refused { fill: none; stroke: var(--warn); stroke-width: 2; }
+.v-cycles .cy-ref { stroke: var(--coverline); stroke-width: 2.5; stroke-linecap: round; }
+/* Valeurs hautes : numéro dans une pastille de la couleur de la courbe */
+.v-cycles .cy-highpill { fill: var(--temp); stroke: var(--surface); stroke-width: 1.5; }
+.v-cycles text.cy-highnum { font-size: 10.5px; font-weight: 700; fill: var(--brand-ink); }
+.v-cycles text.cy-highnum--mini { font-size: 8px; }
+/* Ligne auxiliaire : trait plein bleu (le tireté est réservé aux prévisions) */
+.v-cycles .cy-coverline { stroke: var(--coverline); stroke-width: 2; stroke-linecap: round; }
+.v-cycles text.cy-coverline-label { font-size: 10.5px; font-weight: 700; fill: var(--coverline); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.v-cycles .cy-fhm { stroke: var(--peak); stroke-width: 1.5; stroke-linecap: round; opacity: 0.8; }
+.v-cycles text.cy-fhm-label { font-size: 10px; font-weight: 700; fill: var(--peak); }
+.v-cycles .cy-missing { stroke: var(--danger); stroke-width: 2.5; stroke-linecap: round; }
+
+/* Rangées */
+.v-cycles text.cy-month { font-family: var(--font-body); font-size: 9.5px; font-weight: 700; fill: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.v-cycles text.cy-date { font-size: 11px; fill: var(--ink); }
+.v-cycles text.cy-date--today { font-weight: 700; fill: var(--brand); text-decoration: underline; }
+.v-cycles text.cy-daynum { font-size: 10.5px; fill: var(--muted); }
+.v-cycles text.cy-daynum--five { font-weight: 700; fill: var(--ink-2); }
+.v-cycles .cy-drop { fill: var(--period); }
+.v-cycles .cy-drop--hollow { fill: none; stroke: var(--period); stroke-width: 1.4; }
+.v-cycles .cy-spot { fill: var(--period); }
+.v-cycles text.cy-code { font-size: 11px; fill: var(--ink-2); }
+.v-cycles text.cy-code--strong { font-weight: 700; fill: var(--ink); }
+.v-cycles text.cy-code--missing { fill: var(--muted); }
+.v-cycles .cy-peakbox { fill: var(--peak); }
+.v-cycles .cy-peakbox--provisional { fill: var(--surface); stroke: var(--peak); stroke-width: 1.75; }
+.v-cycles text.cy-peak { font-size: 11px; font-weight: 700; fill: var(--surface); }
+.v-cycles .cy-peakbox--provisional + text.cy-peak { fill: var(--peak); }
+.v-cycles text.cy-peakplus { font-size: 11px; font-weight: 700; fill: var(--peak); }
+.v-cycles .cy-cervix { fill: none; stroke: var(--ink-2); stroke-width: 1.4; }
+.v-cycles .cy-cervix--filled { fill: var(--ink-2); }
+.v-cycles .cy-cervix--changed { stroke: var(--peak); }
+.v-cycles .cy-cervix--changed.cy-cervix--filled { fill: var(--peak); }
+.v-cycles text.cy-lh { font-size: 13px; fill: var(--muted); }
+.v-cycles text.cy-lh--pos { font-weight: 700; fill: var(--peak); }
+.v-cycles .cy-sex { stroke-width: 1.5; }
+.v-cycles .cy-sex--protege { fill: none; stroke: var(--brand); }
+.v-cycles .cy-sex--non { fill: var(--brand); stroke: var(--brand); }
+.v-cycles .cy-sex--incident { fill: var(--danger-soft); stroke: var(--danger); stroke-linejoin: round; }
+
+/* Rangées État et Décision : peintes selon la DÉCISION (S1).
+   État = version pâle (braise claire hachurée) ; Décision = aplat braise hachuré.
+   Sans protection = menthe UNIE à coins ronds (début de cycle : teinte plus claire, coche cerclée). */
+.v-cycles .cy-cell { stroke-width: 1; }
+.v-cycles .cy-cell--protect-soft { fill: var(--protect-soft); stroke: var(--protect); }
+.v-cycles .cy-cell--protect-strong { fill: var(--protect); stroke: var(--protect); }
+.v-cycles .cy-cell--safe { fill: var(--safe-soft); stroke: var(--safe-line); stroke-width: 1.5; }
+.v-cycles .cy-cell--pre { fill: var(--safe-pre-soft); stroke: var(--safe-pre); stroke-width: 1.5; }
+.v-cycles .cy-cell-hatch { pointer-events: none; }
+.v-cycles .cy-cell-split { stroke: var(--ink); stroke-width: 1.25; }
+.v-cycles .cy-hatch { stroke-width: 6; }
+.v-cycles .cy-hatch--soft, .v-cycles .cy-hatch--learn { stroke: var(--protect-hatch-soft); }
+.v-cycles .cy-hatch--strong { stroke: var(--protect-hatch); }
+.v-cycles .cy-cell-ico .icon { stroke-width: 2.4; }
+.v-cycles .cy-cell-ico--protect-soft { color: var(--protect-deep); }
+.v-cycles .cy-cell-ico--protect-strong { color: var(--protect-ink); }
+.v-cycles .cy-cell-ico--safe { color: var(--safe); }
+.v-cycles .cy-cell-ico--pre { color: var(--safe-pre); }
+.v-cycles .cy-cell-ico--mixed { color: var(--ink); }
+.v-cycles .cy-cell-ring { fill: none; stroke: var(--safe-pre); stroke-width: 1.25; }
+.v-cycles .cy-cell-dot { fill: var(--surface); }
+
+/* Zones de toucher */
+.v-cycles .cy-hit { fill: transparent; cursor: pointer; }
+.v-cycles .cy-hit:hover { fill: var(--grid-strong); }
+.v-cycles .cy-hit:focus { outline: none; }
+.v-cycles .cy-hit:focus-visible { fill: var(--grid-strong); stroke: var(--focus); stroke-width: 2.5; }
+
+/* --------------------------------------------------------------------------
+   Légende
+   -------------------------------------------------------------------------- */
+.v-cycles__legend > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border-radius: 14px;
+  background: var(--brand-soft);
+  font-weight: 700;
+  color: var(--brand);
+  cursor: pointer;
+}
+.v-cycles__legend[open] > summary { margin-bottom: var(--space-2); }
+.v-cycles__legend-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.v-cycles__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.v-cycles .cy-mini { flex: none; overflow: visible; }
+.v-cycles__codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.v-cycles__codes b { color: var(--ink); }
+
+/* --------------------------------------------------------------------------
+   « Comment c'est calculé »
+   -------------------------------------------------------------------------- */
+.v-cycles__explain-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.v-cycles__explain-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+}
+.v-cycles__explain-title .icon { color: var(--brand); }
+.v-cycles__explain p { color: var(--ink-2); }
+
+.v-cycles__facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px var(--space-4);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.v-cycles__facts dt { font-weight: 700; color: var(--ink); margin-top: var(--space-2); }
+.v-cycles__facts dd { margin: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+@media (min-width: 480px) {
+  .v-cycles__facts { grid-template-columns: minmax(140px, auto) 1fr; }
+  .v-cycles__facts dt { margin-top: 0; }
+  .v-cycles__facts dt, .v-cycles__facts dd { padding: 6px 0; border-top: 1px solid var(--line); }
+}
+
+/* Badge d'évaluation neutre (en attente, régularité, atypique) : ni code protection, ni menthe */
+.v-cycles .badge--neutral { border-color: var(--line-strong); background: var(--surface); color: var(--ink); }
+.v-cycles .badge--neutral .icon { color: var(--ink-2); }
+
+.v-cycles__flags { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.v-cycles__flag { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+
+/* --------------------------------------------------------------------------
+   Statistiques : tuiles teintées par les ciels de phase (jamais de vert : S5)
+   -------------------------------------------------------------------------- */
+.v-cycles__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+@media (min-width: 560px) {
+  .v-cycles__stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.v-cycles__stat {
+  --stat-tint: var(--brand);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + 2px);
+  border: 1px solid color-mix(in srgb, var(--stat-tint) 45%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--stat-tint) 26%, var(--surface)) 0%, color-mix(in srgb, var(--stat-tint) 8%, var(--surface)) 100%);
+  overflow: hidden;
+}
+.v-cycles__stat::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--stat-tint);
+}
+.v-cycles__stat--lut { --stat-tint: var(--ph-lut); }
+.v-cycles__stat--foll { --stat-tint: var(--ph-foll); }
+.v-cycles__stat--dawn { --stat-tint: var(--ph-regles); }
+.v-cycles__stat--ovu { --stat-tint: var(--ph-ovu); }
+.v-cycles__stat--brand { --stat-tint: var(--brand); }
+.v-cycles__stat-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  line-height: 1.1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.v-cycles__stat-label { font-size: var(--fs-sm); font-weight: 700; color: var(--ink); }
+.v-cycles__stat .hint { color: var(--ink-2); }
+.v-cycles__reg { padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.v-cycles__reg .btn { align-self: flex-start; }
+
+/* Graphique des durées : barres indigo → lavande, cycle affiché marqué d'un point d'or */
+.v-cycles__scroll--bars { border: 1px solid var(--line); border-radius: 14px; }
+.v-cycles .cy-figo { fill: var(--brand-soft); opacity: 0.7; }
+.v-cycles text.cy-figo-label { font-family: var(--font-body); font-size: 10.5px; font-weight: 700; fill: var(--brand); }
+.v-cycles .cy-bar-stop { stop-color: var(--brand); }
+.v-cycles .cy-bar-stop--end { stop-color: var(--ph-lut); }
+.v-cycles .cy-bar { fill: var(--brand); opacity: 0.6; }
+.v-cycles .cy-bar--selected { opacity: 1; stroke: var(--brand); stroke-width: 1.5; }
+.v-cycles .cy-bar--out { fill: var(--warn); }
+/* Atypique : barre vide à bord plein (pas de tireté : réservé aux prévisions) */
+.v-cycles .cy-bar--atypical { fill: var(--surface); stroke: var(--muted); stroke-width: 1.75; opacity: 1; }
+.v-cycles .cy-bar-star { fill: var(--gold); stroke: var(--surface); stroke-width: 1; }
+.v-cycles text.cy-bar-value { font-size: 11px; font-weight: 700; fill: var(--ink); }
+.v-cycles text.cy-bar-value--out { fill: var(--warn); }
+.v-cycles text.cy-bar-label { font-size: 11px; fill: var(--muted); }
+.v-cycles text.cy-bar-label--selected { font-weight: 700; fill: var(--brand); }
+.v-cycles .cy-barg { cursor: pointer; }
+.v-cycles .cy-barg:focus { outline: none; }
+.v-cycles .cy-barg:focus-visible .cy-hit { stroke: var(--focus); stroke-width: 2.5; }
+
+/* Tableau historique */
+.v-cycles__tablewrap {
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  -webkit-overflow-scrolling: touch;
+}
+.v-cycles__table { min-width: 560px; font-size: var(--fs-sm); }
+.v-cycles__table th,
+.v-cycles__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.v-cycles__table thead th { font-size: var(--fs-xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.v-cycles__table tbody tr { cursor: pointer; }
+.v-cycles__table tbody tr:hover { background: var(--surface-2); }
+.v-cycles__table tbody tr.is-selected { background: var(--brand-soft); }
+.v-cycles__table tbody th { padding: 0; }
+.v-cycles__rowbtn {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.v-cycles__table tr.is-selected .v-cycles__rowbtn { text-decoration: none; }
+.v-cycles__yes, .v-cycles__atyp { display: inline-flex; align-items: center; gap: 4px; }
+.v-cycles__yes .icon { color: var(--ok); }
+.v-cycles__atyp .icon { color: var(--info); }
+
+/* --------------------------------------------------------------------------
+   Renvois, état vide
+   -------------------------------------------------------------------------- */
+.v-cycles__more { justify-content: flex-start; text-align: left; }
+.v-cycles__more > span { flex: 1; }
+.v-cycles__more > .icon:first-child { color: var(--brand); }
+
+.v-cycles__empty > p { max-width: 36ch; }
+.v-cycles__sample {
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.v-cycles__steps { display: flex; flex-direction: column; gap: var(--space-2); color: var(--ink-2); }
+
+/* --------------------------------------------------------------------------
+   Feuille « détail du jour » (hors de .v-cycles : ajoutée à <body>)
+   -------------------------------------------------------------------------- */
+.v-cycles-sheet__reason { color: var(--ink-2); font-size: var(--fs-sm); }
+/* Bloc décision : pastille du même code que la courbe, carte pâle bordée */
+.v-cycles-sheet__decision {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 2px solid var(--protect);
+  border-radius: 16px;
+  background: repeating-linear-gradient(135deg, var(--protect-hatch-soft) 0 6px, transparent 6px 12px), var(--protect-soft);
+}
+.v-cycles-sheet__decision > .st { margin-top: 1px; }
+.v-cycles-sheet__decision-label { font-family: var(--font-display); font-size: var(--fs-md); line-height: 1.25; color: var(--protect-deep); }
+.v-cycles-sheet__decision-text { margin-top: var(--space-1); font-size: var(--fs-sm); color: var(--ink); }
+.v-cycles-sheet__decision--safe { border-color: var(--safe-line); background: var(--safe-soft); }
+.v-cycles-sheet__decision--safe .v-cycles-sheet__decision-label { color: var(--safe-text); }
+.v-cycles-sheet__decision--pre { border-color: var(--safe-pre); background: var(--safe-pre-soft); }
+.v-cycles-sheet__decision--pre .v-cycles-sheet__decision-label { color: var(--safe-pre-text); }
+.v-cycles-sheet__list { margin: 0; color: var(--ink-2); font-size: var(--fs-sm); }
+
+/* Impression, couleurs forcées */
+@media print {
+  .v-cycles__scroll { overflow: visible; }
+  .v-cycles .cy-hit { display: none; }
+}
+@media (forced-colors: active) {
+  .v-cycles .cy-line, .v-cycles .cy-coverline { stroke: CanvasText; }
+  .v-cycles .cy-pt { fill: CanvasText; }
+}

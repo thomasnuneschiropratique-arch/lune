@@ -1,0 +1,587 @@
+/* Lune — vue Noter — saisie d'un jour (js/ui/views/log.js). « Ciel de Lune ».
+   Toutes les règles sont préfixées par .v-log. Tokens et composants partagés : css/app.css.
+   Aucune couleur littérale : uniquement des tokens (et color-mix() de tokens).
+
+   Couleurs par thème de section (pastilles d'icône) :
+     saignements = aube (--dawn) · température = indigo (--temp) · glaire = lavande (--ph-lut)
+     col = prune (--peak) · tests = or (--gold) · rapports = abricot (--ph-foll)
+     contraception d'urgence = bleu (--info) · ressenti = soleil (--ph-ovu)
+     cycle = marque (--brand) · notes = encre (--ink-2).
+   Jamais de vert ni de braise ici : ces deux codes sont réservés à la décision (S1, S5). */
+
+.v-log {
+  /* Encre posée sur un aplat pastel (--ph-*, --gold) : foncée dans les deux thèmes. */
+  --on-pastel: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) .v-log { --on-pastel: var(--brand-ink); }
+}
+:root[data-theme="sombre"] .v-log { --on-pastel: var(--brand-ink); }
+
+/* --------------------------------------------------------------------------
+   En-tête : petite lune du jour + navigation de date + état du jour
+   -------------------------------------------------------------------------- */
+.v-log .log-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background:
+    radial-gradient(circle, var(--gold) 0 1.3px, transparent 1.8px) 12% 22% / 6px 6px no-repeat,
+    radial-gradient(circle, var(--gold) 0 1px, transparent 1.5px) 88% 16% / 6px 6px no-repeat,
+    radial-gradient(circle, var(--brand) 0 1px, transparent 1.5px) 95% 90% / 6px 6px no-repeat,
+    linear-gradient(180deg, var(--wash) 0%, color-mix(in srgb, var(--wash) 35%, var(--surface)) 100%);
+}
+.v-log .log-head .eyebrow { text-align: center; }
+.v-log .log-datenav {
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  align-items: center;
+  gap: var(--space-2);
+}
+.v-log .log-datenav .iconbtn { color: var(--brand); background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.v-log .log-datenav .iconbtn:hover { background: var(--surface); }
+.v-log .log-datenav .iconbtn:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; }
+.v-log .log-date-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.v-log .log-moon { display: inline-grid; flex: none; margin: -6px 0; }
+.v-log .log-date {
+  min-width: 0;
+  font-size: var(--fs-lg);
+  text-align: center;
+  line-height: 1.2;
+}
+.v-log .log-date::first-letter { text-transform: uppercase; }
+.v-log .log-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.v-log .log-head__cycleday {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+  color: var(--brand);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.v-log .log-head__empty { font-size: var(--fs-sm); }
+.v-log .log-head__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.v-log .log-datepick {
+  width: auto;
+  min-height: var(--tap);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: max(16px, 1rem);
+}
+
+/* --------------------------------------------------------------------------
+   Sections repliables (<details class="card log-sec log-sec--<clé>">)
+   --sec : couleur du thème ; --tile-bg / --tile-fg : pastille d'icône (icône ≥ 3:1 sur la pastille).
+   -------------------------------------------------------------------------- */
+.v-log .log-sec {
+  --sec: var(--brand);
+  --tile-bg: var(--sec);
+  --tile-fg: var(--surface);
+  padding: 0;
+  overflow: hidden;
+}
+/* Thèmes « profonds » : aplat de la couleur, icône couleur de surface (≥ 6:1 dans les deux thèmes) */
+.v-log .log-sec--temperature { --sec: var(--temp); }
+.v-log .log-sec--col { --sec: var(--peak); }
+.v-log .log-sec--cu { --sec: var(--info); }
+.v-log .log-sec--cycle { --sec: var(--brand); }
+.v-log .log-sec--notes { --sec: var(--ink-2); }
+/* Thèmes « pastel » : aplat lumineux, encre foncée dans les deux thèmes */
+.v-log .log-sec--glaire,
+.v-log .log-sec--tests,
+.v-log .log-sec--rapports,
+.v-log .log-sec--ressenti,
+.v-log .log-sec--saignements {
+  --tile-bg: var(--sec);
+  --tile-fg: color-mix(in srgb, var(--sec) 22%, var(--on-pastel));
+}
+.v-log .log-sec--glaire { --sec: var(--ph-lut); }
+.v-log .log-sec--tests { --sec: var(--gold); }
+.v-log .log-sec--rapports { --sec: var(--ph-foll); }
+.v-log .log-sec--ressenti { --sec: var(--ph-ovu); }
+.v-log .log-sec--saignements { --sec: var(--ph-regles); --tile-bg: var(--dawn); --tile-fg: var(--on-pastel); }
+
+.v-log .log-sec[open] { box-shadow: inset 0 4px 0 var(--sec), var(--shadow-1); }
+.v-log .log-sec--saignements[open] {
+  box-shadow: var(--shadow-1);
+  background: var(--dawn) top / 100% 4px no-repeat, var(--surface);
+}
+
+.v-log .log-sec__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.v-log .log-sec__head::-webkit-details-marker { display: none; }
+.v-log .log-sec__head::marker { content: ''; }
+.v-log .log-sec__head:hover { background: color-mix(in srgb, var(--sec) 7%, var(--surface)); }
+.v-log .log-sec__head:focus-visible { outline-offset: -3px; border-radius: var(--radius); }
+.v-log .log-sec__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--tile-bg);
+  color: var(--tile-fg);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 10%, transparent);
+  transition: transform 260ms var(--ease-pop);
+}
+.v-log .log-sec__icon .icon { stroke-width: 2.1; }
+.v-log .log-sec[open] > .log-sec__head .log-sec__icon { transform: rotate(-6deg); }
+.v-log .log-sec__titles {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.v-log .log-sec__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 400;
+  line-height: 1.25;
+}
+.v-log .log-sec__summary {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.v-log .log-sec__chev {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  transition: transform var(--dur) var(--ease);
+}
+.v-log .log-sec[open] > .log-sec__head .log-sec__chev { transform: rotate(180deg); }
+.v-log .log-sec[open] > .log-sec__head { border-bottom: 1px solid var(--line); }
+.v-log .log-sec__body { padding: var(--space-4); }
+@media (min-width: 480px) {
+  .v-log .log-sec__head { padding: var(--space-3) var(--space-5); }
+  .v-log .log-sec__body { padding: var(--space-4) var(--space-5) var(--space-5); }
+}
+
+/* Zones dynamiques : invisibles quand elles sont vides */
+.v-log .log-slot { display: flex; flex-direction: column; gap: var(--space-3); }
+.v-log .log-slot:empty { display: none; }
+
+/* --------------------------------------------------------------------------
+   Contrôles segmentés : sélection franche (aplat de marque + coche)
+   -------------------------------------------------------------------------- */
+.v-log .seg { border-color: var(--line); }
+.v-log .seg__opt { position: relative; font-size: var(--fs-sm); }
+.v-log .seg__opt[aria-pressed="true"] { font-weight: 700; }
+.v-log .log-seg__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v-log .log-seg--grid3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+.v-log .log-seg--grid2 { display: grid; grid-template-columns: repeat(2, 1fr); }
+.v-log .log-seg--list { flex-direction: column; }
+.v-log .log-seg--list .seg__opt {
+  flex: none;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: 8px 12px;
+  text-align: left;
+}
+.v-log .log-seg--list .log-seg__label { font-size: var(--fs-base); }
+.v-log .log-seg__hint {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.v-log .log-seg--list .seg__opt[aria-pressed="true"] .log-seg__hint { color: inherit; opacity: 0.92; }
+
+/* Petite pastille de code Sensiplan dans la liste (même teinte que la grande) */
+.v-log .log-seg__code {
+  --code-bg: var(--surface);
+  --code-fg: var(--ink-2);
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.6em;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--code-fg) 40%, transparent);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.v-log .log-seg__code[data-q="2"] { --code-bg: color-mix(in srgb, var(--ph-lut) 40%, var(--surface)); --code-fg: var(--ink); }
+.v-log .log-seg__code[data-q="3"] { --code-bg: var(--ph-lut); --code-fg: color-mix(in srgb, var(--ph-lut) 15%, var(--on-pastel)); }
+.v-log .log-seg__code[data-q="4"] { --code-bg: var(--peak); --code-fg: var(--brand-ink); }
+
+/* --------------------------------------------------------------------------
+   Puces, cases, interrupteurs
+   -------------------------------------------------------------------------- */
+.v-log .log-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.v-log .log-chips .chip { transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), transform 220ms var(--ease-pop); }
+.v-log .log-chips .chip[aria-pressed="true"] { font-weight: 700; }
+.v-log .log-chips .chip:active { transform: scale(0.96); }
+
+.v-log .log-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  cursor: pointer;
+}
+.v-log .log-check input { flex: none; accent-color: var(--brand); }
+
+.v-log .log-switch { display: flex; flex-direction: column; gap: var(--space-1); }
+.v-log .log-switch__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  cursor: pointer;
+}
+.v-log .log-switch__label { font-weight: 700; line-height: 1.3; }
+.v-log .log-switch__input {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.v-log .log-switch__input::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 260ms var(--ease-pop), background-color var(--dur) var(--ease);
+}
+.v-log .log-switch__input:checked { border-color: var(--brand); background: var(--brand); }
+.v-log .log-switch__input:checked::before { background: var(--brand-ink); transform: translateX(20px); }
+.v-log .log-switch__input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* --------------------------------------------------------------------------
+   Saignements : question « 1er jour ? » (marqueur aube, fond neutre : S3)
+   -------------------------------------------------------------------------- */
+.v-log .log-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: calc(var(--space-3) + 4px) var(--space-4) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--dawn) top / 100% 4px no-repeat, var(--surface-2);
+}
+.v-log .log-question__title { font-weight: 700; line-height: 1.3; }
+
+/* --------------------------------------------------------------------------
+   Température (indigo)
+   -------------------------------------------------------------------------- */
+.v-log .log-temp {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.v-log .log-temp__input {
+  min-height: 60px;
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--temp) 55%, var(--line-strong));
+  background: color-mix(in srgb, var(--temp) 6%, var(--surface));
+  color: var(--ink);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+.v-log .log-temp__step {
+  min-width: 64px;
+  padding: 8px 10px;
+  border-color: color-mix(in srgb, var(--temp) 45%, var(--line-strong));
+  color: var(--temp);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.v-log .log-temp__step:hover { background: color-mix(in srgb, var(--temp) 10%, var(--surface)); }
+.v-log .log-temp-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+@media (min-width: 420px) {
+  .v-log .log-temp-meta { grid-template-columns: minmax(120px, 0.6fr) 1.4fr; align-items: start; }
+}
+.v-log .log-time { font-family: var(--font-mono); }
+.v-log .log-error {
+  color: var(--danger);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.v-log .log-error:empty { display: none; }
+.v-log .log-confirmed,
+.v-log .log-conditions,
+.v-log .log-reminder {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.v-log .log-confirmed .icon { color: var(--ok); margin-top: 2px; }
+.v-log .log-conditions .icon,
+.v-log .log-reminder .icon { color: var(--info); margin-top: 2px; }
+.v-log .log-conditions {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--info-soft);
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------------------------------
+   Glaire : code du jour en grande pastille colorée (lavande → prune)
+   data-state : vide | incomplet | douteux | ok ; data-q : 0…4
+   -------------------------------------------------------------------------- */
+.v-log .log-code {
+  --code-bg: var(--surface);
+  --code-fg: var(--muted);
+  --code-ring: var(--line-strong);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "value label"
+    "value meaning";
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--ph-lut) 14%, var(--surface-2));
+}
+.v-log .log-code__label { grid-area: label; align-self: end; color: var(--ink-2); }
+.v-log .log-code__value {
+  grid-area: value;
+  display: inline-grid;
+  place-items: center;
+  min-width: 80px;
+  height: 80px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  box-shadow: inset 0 0 0 2px var(--code-ring), 0 0 0 6px color-mix(in srgb, var(--code-bg) 35%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.v-log .log-code__meaning { grid-area: meaning; align-self: start; font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.4; }
+.v-log .log-code[data-state="ok"][data-q="0"],
+.v-log .log-code[data-state="ok"][data-q="1"] { --code-bg: var(--surface); --code-fg: var(--ink-2); --code-ring: var(--line-strong); }
+.v-log .log-code[data-state="ok"][data-q="2"] {
+  --code-bg: color-mix(in srgb, var(--ph-lut) 40%, var(--surface));
+  --code-fg: var(--ink);
+  --code-ring: color-mix(in srgb, var(--ph-lut) 60%, var(--ink));
+}
+.v-log .log-code[data-state="ok"][data-q="3"] {
+  --code-bg: var(--ph-lut);
+  --code-fg: color-mix(in srgb, var(--ph-lut) 15%, var(--on-pastel));
+  --code-ring: color-mix(in srgb, var(--ph-lut) 55%, var(--ink));
+}
+.v-log .log-code[data-state="ok"][data-q="4"] {
+  --code-bg: var(--peak);
+  --code-fg: var(--brand-ink);
+  --code-ring: var(--peak);
+}
+/* Observation absente ou incomplète : neutre (le tireté reste réservé aux prévisions, S2) */
+.v-log .log-code[data-state="vide"] .log-code__value,
+.v-log .log-code[data-state="incomplet"] .log-code__value { font-size: var(--fs-xl); }
+.v-log .log-code[data-state="douteux"] {
+  --code-bg: var(--warn-soft);
+  --code-fg: var(--warn);
+  --code-ring: var(--warn);
+}
+.v-log .log-code[data-state="douteux"] .log-code__value { text-decoration: line-through; text-decoration-thickness: 3px; }
+
+/* --------------------------------------------------------------------------
+   Ressenti : douleur
+   -------------------------------------------------------------------------- */
+.v-log .log-pain__value {
+  min-width: 5.5em;
+  font-weight: 700;
+  text-align: right;
+}
+.v-log .log-pain__range { accent-color: var(--brand); }
+.v-log .log-pain__range.is-unset { accent-color: var(--line-strong); opacity: 0.7; }
+
+/* --------------------------------------------------------------------------
+   Pied de page et barre d'enregistrement collante
+   -------------------------------------------------------------------------- */
+.v-log .log-foot { align-items: center; text-align: center; padding: var(--space-2) 0; }
+.v-log .log-prudence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.v-log .log-prudence .icon { color: var(--brand); }
+.v-log .log-foot__delete { color: var(--danger); }
+.v-log .log-foot__delete:hover { background: var(--danger-soft); }
+
+.v-log .log-savebar {
+  position: sticky;
+  /* au-dessus de la barre d'onglets et du bouton central « Noter » qui dépasse */
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 30px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  -webkit-backdrop-filter: saturate(1.2) blur(10px);
+  backdrop-filter: saturate(1.2) blur(10px);
+  box-shadow: var(--shadow-2);
+}
+.v-log .log-savebar__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.v-log .log-savebar__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: var(--space-2);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.v-log .log-savebar__state::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+}
+.v-log .log-savebar__state[data-dirty="true"] { color: var(--warn); }
+.v-log .log-savebar__state[data-dirty="true"]::before { border-color: var(--warn); background: var(--warn); }
+.v-log .log-savebar__btnwrap {
+  position: relative;
+  display: flex;
+  flex: 0 1 60%;
+  min-width: 0;
+}
+.v-log .log-savebar__btn { flex: 1 1 auto; min-height: 54px; }
+.v-log .log-savebar__error { padding: 0 var(--space-2); }
+
+/* Célébration après « Enregistrer » : coche qui pop + éclat d'étoiles dorées (≤ 600 ms).
+   Décor seulement (aria-hidden) ; rien du tout sous prefers-reduced-motion. */
+.v-log .log-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+}
+.v-log .log-burst::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  opacity: 0;
+}
+.v-log .log-burst__star {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  color: var(--gold);
+  opacity: 0;
+}
+.v-log .log-burst__star .icon { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.v-log .log-burst__star--big { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+.v-log .log-burst__star--big .icon { width: 18px; height: 18px; }
+@media (prefers-reduced-motion: no-preference) {
+  .v-log .log-burst { display: block; }
+  .v-log .log-burst__star { animation: log-twinkle 520ms var(--ease) var(--delay, 0ms) both; }
+  .v-log .log-savebar__btn.is-celebrating .icon { animation: log-pop 460ms var(--ease-pop) both; }
+  .v-log .log-burst::before { animation: log-glow 600ms var(--ease) both; }
+}
+@keyframes log-twinkle {
+  0% { opacity: 0; transform: scale(0.2) rotate(0deg); }
+  45% { opacity: 1; transform: scale(1.15) rotate(45deg); }
+  100% { opacity: 0; transform: scale(0.6) rotate(90deg); }
+}
+@keyframes log-pop {
+  0% { transform: scale(0.4); }
+  55% { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+@keyframes log-glow {
+  0% { opacity: 1; box-shadow: 0 0 0 0 var(--gold); }
+  100% { opacity: 0; box-shadow: 0 0 0 10px var(--gold); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v-log .log-sec__icon, .v-log .log-chips .chip, .v-log .log-switch__input::before { transition: none; }
+  .v-log .log-sec[open] > .log-sec__head .log-sec__icon { transform: none; }
+}
+
+@media (forced-colors: active) {
+  .v-log .log-switch__input::before { background: CanvasText; }
+  .v-log .log-switch__input:checked { background: Highlight; }
+  .v-log .log-code__value { border: 2px solid CanvasText; }
+  .v-log .log-burst { display: none; }
+}
+
+/* Saisie ouverte la veille (VA-7) : message + bouton « Rouvrir sur aujourd'hui ». */
+.v-log .log-savebar__error .btn { margin-inline-start: var(--space-2); vertical-align: middle; }

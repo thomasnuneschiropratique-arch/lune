@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Lune</title>
+  <meta name="description" content="Carnet de cycle personnel. Données gardées sur cet appareil.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#e6e0f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1d1846" media="(prefers-color-scheme: dark)">
+  <meta name="referrer" content="no-referrer">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- Installation (iOS / Android) -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Lune">
+  <meta name="application-name" content="Lune">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <!-- Thème choisi (clair / sombre) appliqué avant le premier rendu pour éviter un flash -->
+  <script>
+    try {
+      var lune = JSON.parse(localStorage.getItem('lune:data:v1') || 'null');
+      var theme = lune && lune.settings && lune.settings.theme;
+      if (theme === 'clair' || theme === 'sombre') document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) { /* stockage indisponible : thème automatique */ }
+  </script>
+
+  <!-- Polices (repli système si hors ligne) -->
+  <link rel="stylesheet" href="css/fonts.css">
+
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/views/today.css">
+  <link rel="stylesheet" href="css/views/log.css">
+  <link rel="stylesheet" href="css/views/calendar.css">
+  <link rel="stylesheet" href="css/views/cycles.css">
+  <link rel="stylesheet" href="css/views/learn.css">
+  <link rel="stylesheet" href="css/views/settings.css">
+  <link rel="stylesheet" href="css/views/onboarding.css">
+  <link rel="stylesheet" href="css/views/urgence.css">
+</head>
+<body>
+  <div id="app">
+    <div class="boot-fallback" role="status" style="max-width:640px;margin:0 auto;padding:24px 16px;font-family:system-ui,sans-serif;line-height:1.5">
+      <p><strong>Chargement…</strong></p>
+      <p>Si ce message reste affiché, Lune n'a pas pu démarrer : considère chaque jour comme fertile (protection nécessaire), reconnecte-toi puis recharge.</p>
+    </div>
+  </div>
+  <noscript>
+    <div style="max-width:640px;margin:0 auto;padding:24px 16px;font-family:system-ui,sans-serif;line-height:1.5">
+      <h1 style="font-family:Georgia,serif;font-weight:400">Lune</h1>
+      <p>Lune a besoin de JavaScript pour fonctionner. Active-le dans les réglages de ton navigateur, puis recharge la page.</p>
+      <p>Tes données restent sur cet appareil : rien n'est envoyé sur internet.</p>
+    </div>
+  </noscript>
+  <!-- Secours si l'app ne démarre pas (script manquant, erreur au chargement, précache incomplet) -->
+  <script>
+    (function () {
+      var shown = false;
+      function showFallback() {
+        if (shown || document.documentElement.getAttribute('data-ready')) return;
+        var app = document.getElementById('app');
+        if (!app) return;
+        shown = true;
+        var box = document.createElement('div');
+        box.className = 'boot-fallback';
+        box.setAttribute('role', 'alert');
+        box.style.cssText = 'max-width:640px;margin:0 auto;padding:24px 16px;font-family:system-ui,sans-serif;line-height:1.5';
+        var title = document.createElement('p');
+        var strong = document.createElement('strong');
+        strong.textContent = 'Lune n\u2019a pas pu démarrer';
+        title.appendChild(strong);
+        var text = document.createElement('p');
+        text.textContent = 'Considère chaque jour comme fertile (protection nécessaire). Reconnecte-toi à internet, puis recharge la page.';
+        box.appendChild(title);
+        box.appendChild(text);
+        while (app.firstChild) app.removeChild(app.firstChild);
+        app.appendChild(box);
+      }
+      window.addEventListener('error', function (event) {
+        var target = event && event.target;
+        // Erreurs d'exécution, ou script introuvable ; pas une police ou une image manquante.
+        if (target && target !== window && target.tagName !== 'SCRIPT') return;
+        showFallback();
+      }, true);
+      setTimeout(showFallback, 10000);
+    })();
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

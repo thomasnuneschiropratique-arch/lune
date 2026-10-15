@@ -1,0 +1,318 @@
+/* Lune — vue Réglages, sauvegarde, à propos (js/ui/views/settings.js).
+   Règles de la vue préfixées par .v-settings. Les feuilles (confirmations, aperçu du
+   résumé) sont rendues hors de la vue : leurs classes commencent par .v-settings__ /
+   .v-settings-summary, et la version imprimable par .v-settings-print.
+   Tokens et composants partagés : css/app.css. Aucune couleur littérale.
+   « Ciel de Lune » : chaque carte a sa pastille d'icône colorée (or, indigo, lavande, bleu,
+   abricot, prune, soleil, aube) et un liseré de la même couleur. Jamais de vert ni de braise :
+   ces codes sont réservés à la décision (S1, S5). */
+
+.v-settings {
+  --on-pastel: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) .v-settings { --on-pastel: var(--brand-ink); }
+}
+:root[data-theme="sombre"] .v-settings { --on-pastel: var(--brand-ink); }
+
+.v-settings__head { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) var(--space-1) 0; }
+.v-settings__h1 { margin: 0; font-size: var(--fs-xl); color: var(--ink); }
+
+/* Cartes : --sec = couleur du thème ; pastilles « profondes » (aplat + icône couleur de surface)
+   ou « pastel » (aplat lumineux + encre foncée dans les deux thèmes) */
+.v-settings__card {
+  --sec: var(--brand);
+  --tile-bg: var(--sec);
+  --tile-fg: var(--surface);
+  border-top: 4px solid var(--sec);
+}
+#set-rules { --sec: var(--brand); }
+#set-backup { --sec: var(--info); }
+#set-summary { --sec: var(--peak); }
+#set-about { --sec: var(--ink-2); }
+#set-profile, #set-display, #set-reminders, #set-demo, #set-intro {
+  --tile-bg: var(--sec);
+  --tile-fg: color-mix(in srgb, var(--sec) 20%, var(--on-pastel));
+}
+#set-profile { --sec: var(--gold); }
+#set-display { --sec: var(--ph-lut); }
+#set-reminders { --sec: var(--ph-foll); }
+#set-demo { --sec: var(--ph-ovu); }
+#set-intro { --sec: var(--ph-regles); }
+
+.v-settings__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+}
+.v-settings__ico {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--tile-bg, var(--brand));
+  color: var(--tile-fg, var(--surface));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.v-settings__ico .icon { width: 22px; height: 22px; stroke-width: 2; }
+
+.v-settings p { margin: 0; }
+.v-settings .card > .muted { max-width: 62ch; }
+
+/* --------------------------------------------------------------------------
+   Formulaire de profil
+   -------------------------------------------------------------------------- */
+.v-settings__fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.v-settings__fieldset > legend { padding: 0; margin-bottom: 6px; }
+.v-settings [hidden] { display: none !important; }
+.v-settings__sub {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+}
+.v-settings__pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+@media (min-width: 420px) {
+  .v-settings__pair { grid-template-columns: 1fr 1fr; }
+}
+.v-settings .seg__opt { cursor: pointer; }
+.v-settings .seg input:focus-visible + .seg__opt {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.v-settings__errors:empty, .v-settings__message:empty { display: none; }
+.v-settings__errors { display: flex; flex-direction: column; gap: var(--space-2); }
+.v-settings__dirty:empty { display: none; }
+.v-settings__dirty { color: var(--warn); font-weight: 600; }
+
+/* --------------------------------------------------------------------------
+   Interrupteurs
+   -------------------------------------------------------------------------- */
+.v-settings__toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.v-settings__toggle-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.v-settings__toggle-text > .label { cursor: pointer; min-height: 24px; }
+.v-settings__toggle-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.v-settings__switch-state {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+}
+.v-settings .v-settings__switch {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 56px;
+  height: 34px;
+  margin: 5px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background:
+    radial-gradient(circle, var(--ink-2) 0 11px, transparent 12px) no-repeat left 2px center / 28px 28px,
+    var(--surface-2);
+  position: relative;
+  cursor: pointer;
+  transition: background-position var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+/* Cible tactile de 44 px (S6) sans changer le dessin de l'interrupteur */
+.v-settings .v-settings__switch::after { content: ''; position: absolute; inset: -6px -4px; }
+.v-settings .v-settings__switch:checked {
+  border-color: var(--brand);
+  background:
+    radial-gradient(circle, var(--brand-ink) 0 11px, transparent 12px) no-repeat right 2px center / 28px 28px,
+    var(--brand);
+}
+.v-settings .v-settings__switch:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .v-settings .v-settings__switch { border: 2px solid ButtonText; }
+  .v-settings .v-settings__switch:checked { background: Highlight; }
+}
+
+/* --------------------------------------------------------------------------
+   Lignes d'état (couleur + icône + texte)
+   -------------------------------------------------------------------------- */
+.v-settings__status {
+  --st-tone: var(--muted);
+  --st-soft: var(--surface-2);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--st-tone);
+  border-radius: var(--radius-sm);
+  background: var(--st-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.v-settings__status > .icon { flex: none; color: var(--st-tone); margin-top: 1px; }
+.v-settings__status-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v-settings__status--ok { --st-tone: var(--ok); --st-soft: var(--ok-soft); }
+.v-settings__status--warn { --st-tone: var(--warn); --st-soft: var(--warn-soft); }
+.v-settings__status--danger { --st-tone: var(--danger); --st-soft: var(--danger-soft); }
+.v-settings__status--info { --st-tone: var(--info); --st-soft: var(--info-soft); }
+.v-settings__status--neutral { --st-tone: var(--muted); --st-soft: var(--surface-2); }
+
+.v-settings__persist { display: flex; flex-direction: column; gap: var(--space-2); }
+.v-settings__danger {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.v-settings__danger > .label { margin: 0; color: var(--danger); }
+
+/* --------------------------------------------------------------------------
+   Liens, listes, détails
+   -------------------------------------------------------------------------- */
+.v-settings__links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.v-settings__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.v-settings__link:hover { color: var(--ink); }
+.v-settings__link .icon { flex: none; }
+
+.v-settings__list {
+  margin: 0;
+  padding-left: 1.25em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  line-height: 1.45;
+}
+.v-settings__list--steps { gap: var(--space-2); }
+
+.v-settings__details {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.v-settings__details > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-3);
+  font-weight: 600;
+  cursor: pointer;
+}
+.v-settings__details > :not(summary) { margin: 0 var(--space-3) var(--space-3); }
+
+.v-settings__prose { line-height: 1.55; color: var(--ink-2); }
+.v-settings__prose strong { color: var(--ink); }
+
+/* --------------------------------------------------------------------------
+   Contenu des feuilles (hors de la vue)
+   -------------------------------------------------------------------------- */
+.v-settings__confirm { display: flex; flex-direction: column; gap: var(--space-3); }
+.v-settings__confirm-p { display: block; }
+.v-settings__confirm .v-settings__list,
+.v-settings__sheet .v-settings__list {
+  margin: 0;
+  padding-left: 1.25em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  line-height: 1.45;
+}
+.v-settings__export-text {
+  min-height: 160px;
+  font-size: var(--fs-xs);
+  word-break: break-all;
+}
+.v-settings__preview {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Résumé pour un·e soignant·e (aperçu et impression)
+   -------------------------------------------------------------------------- */
+.v-settings-summary { color: var(--ink); line-height: 1.45; }
+.v-settings-summary p, .v-settings-summary h2, .v-settings-summary h3 { margin: 0; }
+.v-settings-summary__title { font-size: var(--fs-lg); }
+.v-settings-summary h3 {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.v-settings-summary__warn { font-size: var(--fs-sm); color: var(--muted); font-style: italic; }
+.v-settings-summary__dl { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.v-settings-summary__dl > div { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.v-settings-summary__dl dt { font-weight: 700; font-size: var(--fs-sm); color: var(--ink-2); }
+.v-settings-summary__dl dd { margin: 0; }
+@media (min-width: 520px) {
+  .v-settings-summary__dl > div { grid-template-columns: minmax(150px, 34%) 1fr; gap: var(--space-3); }
+}
+.v-settings-summary__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-xs);
+}
+.v-settings-summary__table th,
+.v-settings-summary__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.v-settings-summary__table thead th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.v-settings-summary__table tbody th { font-weight: 700; white-space: nowrap; }
+.v-settings-summary__foot { font-size: var(--fs-sm); color: var(--muted); }
+
+.v-settings-print { display: none; }
+
+@media print {
+  html.v-settings-printing, html.v-settings-printing body {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  html.v-settings-printing .app,
+  html.v-settings-printing .sheet-layer,
+  html.v-settings-printing .toast-region { display: none !important; }
+  html.v-settings-printing .v-settings-print { display: block; padding: 0; }
+  /* Couleurs héritées du fond blanc d'impression (app.css), même en thème sombre. */
+  .v-settings-print, .v-settings-print * { color: inherit !important; }
+  .v-settings-print .v-settings-summary { font-size: 11pt; }
+  .v-settings-print .v-settings-summary section { break-inside: avoid; }
+  .v-settings-print .v-settings-summary__table { font-size: 9.5pt; }
+  .v-settings-print .v-settings-summary__table tr { break-inside: avoid; }
+}
